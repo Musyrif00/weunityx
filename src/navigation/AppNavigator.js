@@ -2,7 +2,8 @@ import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createStackNavigator } from "@react-navigation/stack";
 import { IconButton } from "react-native-paper";
-import { theme } from "../constants/theme";
+import { theme as staticTheme } from "../constants/theme";
+import { useTheme } from "../contexts/ThemeContext";
 
 // Import screens
 import HomeScreen from "../screens/Home";
@@ -28,6 +29,8 @@ import EditProfileScreen from "../screens/Profile/Edit";
 import SettingsScreen from "../screens/Profile/Settings";
 import EventDetailScreen from "../screens/Events/Detail";
 import AddEventScreen from "../screens/Events/Add";
+import SavedPostsScreen from "../screens/SavedPosts";
+import BlockedUsersScreen from "../screens/BlockedUsers";
 
 import { useAuth } from "../contexts/AuthContext";
 
@@ -40,6 +43,9 @@ const TabIcon = ({ name, color, size }) => (
 );
 
 const TabNavigator = () => {
+  // Always use light theme (disabled dynamic theming)
+  const theme = staticTheme;
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -114,7 +120,7 @@ const AuthNavigator = () => {
     <AuthStack.Navigator
       screenOptions={{
         headerShown: false,
-        cardStyle: { backgroundColor: theme.colors.background },
+        cardStyle: { backgroundColor: staticTheme.colors.background },
       }}
     >
       <AuthStack.Screen name="SignIn" component={SignInScreen} />
@@ -126,6 +132,9 @@ const AuthNavigator = () => {
 
 const AppNavigator = () => {
   const { user, isLoading } = useAuth();
+
+  // Always use light theme (disabled dynamic theming)
+  const theme = staticTheme;
 
   if (isLoading) {
     return null; // You can return a loading screen here
@@ -160,6 +169,8 @@ const AppNavigator = () => {
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
           <Stack.Screen name="EventDetail" component={EventDetailScreen} />
           <Stack.Screen name="AddEvent" component={AddEventScreen} />
+          <Stack.Screen name="SavedPosts" component={SavedPostsScreen} />
+          <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
         </>
       ) : (
         <Stack.Screen

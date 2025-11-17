@@ -1,37 +1,89 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, StyleSheet, FlatList, Image, ScrollView } from "react-native";
-import { Text, IconButton, Chip, FAB } from "react-native-paper";
+import {
+  Text,
+  IconButton,
+  Chip,
+  FAB,
+  ActivityIndicator,
+} from "react-native-paper";
 import { Card } from "../components";
-import { theme, spacing, mockEvents } from "../constants";
+import { HeaderLogo } from "../components/Logo";
+import { theme as staticTheme, spacing } from "../constants";
+import { eventService } from "../services/firebase";
 
 const EventCard = ({ event, onPress }) => {
+  const formatEventDate = (date) => {
+    if (!date) return "";
+    return date.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const isEventPast = (date) => {
+    return date && new Date(date) < new Date();
+  };
+
+  const isPast = isEventPast(event.date);
+
   return (
-    <Card onPress={onPress} style={styles.eventCard}>
+    <Card
+      onPress={onPress}
+      style={[styles.eventCard, isPast && styles.pastEventCard]}
+    >
       {event.image && (
         <Image source={{ uri: event.image }} style={styles.eventImage} />
       )}
 
       <View style={styles.eventContent}>
-        <Text style={styles.eventTitle}>{event.title}</Text>
-        <Text style={styles.eventDescription}>{event.description}</Text>
+        <View style={styles.eventHeader}>
+          <Text style={styles.eventTitle} numberOfLines={2}>
+            {event.title}
+          </Text>
+          {isPast && (
+            <Chip style={styles.pastChip} textStyle={styles.pastChipText}>
+              Past
+            </Chip>
+          )}
+        </View>
+
+        <Text style={styles.eventDescription} numberOfLines={3}>
+          {event.description}
+        </Text>
 
         <View style={styles.eventMeta}>
           <Chip icon="calendar" style={styles.metaChip}>
-            {event.date.toLocaleDateString()}
+            {formatEventDate(event.date)}
           </Chip>
 
           <Chip icon="map-marker" style={styles.metaChip}>
             {event.location}
           </Chip>
+
+          {event.category && (
+            <Chip style={styles.metaChip}>{event.category}</Chip>
+          )}
         </View>
 
         <View style={styles.eventFooter}>
-          <Text style={styles.attendeesText}>{event.attendees} attending</Text>
+          <View style={styles.eventStats}>
+            <Text style={styles.attendeesText}>
+              {event.attendeesCount || 0} attending
+            </Text>
+            <Text style={styles.organizerText}>
+              by {event.organizerName || "Unknown"}
+            </Text>
+          </View>
 
           <IconButton
             icon="bookmark-outline"
-            iconColor={theme.colors.primary}
-            onPress={() => console.log("Save event")}
+            iconColor={staticTheme.colors.primary}
+            onPress={(e) => {
+              e.stopPropagation();
+              // Save event functionality
+            }}
           />
         </View>
       </View>
@@ -40,20 +92,73 @@ const EventCard = ({ event, onPress }) => {
 };
 
 const EventsScreen = ({ navigation }) => {
-  const [events, setEvents] = useState(mockEvents);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState("all");
 
+  useEffect(() => {
+    loadEvents();
+
+    // Subscribe to real-time events updates
+    const unsubscribe = eventService.subscribeToEvents((eventsData) => {
+      setEvents(eventsData);
+      setLoading(false);
+    });
+
+    return () => unsubscribe?.();
+  }, []);
+
+  const loadEvents = async () => {
+    try {
+      setLoading(true);
+      const eventsData = await eventService.getEvents(50);
+      setEvents(eventsData);
+    } catch (error) {
+      console.error("Error loading events:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadEvents();
+    setRefreshing(false);
+  };
+
   const filteredEvents = events.filter((event) => {
-    if (filter === "all") return true;
-    if (filter === "upcoming") return event.date > new Date();
-    if (filter === "past") return event.date < new Date();
-    return true;
+    const now = new Date();
+    const eventDate = new Date(event.date);
+
+    switch (filter) {
+      case "upcoming":
+        return eventDate > now;
+      case "past":
+        return eventDate < now;
+      case "today":
+        return eventDate.toDateString() === now.toDateString();
+      case "this-week":
+        const weekFromNow = new Date();
+        weekFromNow.setDate(now.getDate() + 7);
+        return eventDate >= now && eventDate <= weekFromNow;
+      default:
+        return true;
+    }
   });
 
   const renderEvent = ({ item }) => (
     <EventCard
       event={item}
-      onPress={() => navigation.navigate("EventDetail", { event: item })}
+      onPress={() => {
+        // Convert Date objects to ISO strings for navigation serialization
+        const serializableEvent = {
+          ...item,
+          date: item.date?.toISOString() || null,
+          createdAt: item.createdAt?.toISOString() || null,
+        };
+        navigation.navigate("EventDetail", { event: serializableEvent });
+      }}
     />
   );
 
@@ -63,43 +168,87 @@ const EventsScreen = ({ navigation }) => {
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.filterContainer}
     >
-      {["all", "upcoming", "past"].map((filterType) => (
+      {[
+        { key: "all", label: "All" },
+        { key: "upcoming", label: "Upcoming" },
+        { key: "today", label: "Today" },
+        { key: "this-week", label: "This Week" },
+        { key: "past", label: "Past" },
+      ].map((filterType) => (
         <Chip
-          key={filterType}
-          selected={filter === filterType}
-          onPress={() => setFilter(filterType)}
+          key={filterType.key}
+          selected={filter === filterType.key}
+          onPress={() => setFilter(filterType.key)}
           style={styles.filterChip}
         >
-          {filterType.charAt(0).toUpperCase() + filterType.slice(1)}
+          {filterType.label}
         </Chip>
       ))}
     </ScrollView>
   );
 
+  const EmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <IconButton
+        icon="calendar-outline"
+        size={64}
+        iconColor={staticTheme.colors.textSecondary}
+      />
+      <Text style={styles.emptyTitle}>No events found</Text>
+      <Text style={styles.emptySubtitle}>
+        {filter === "all"
+          ? "Be the first to create an event!"
+          : `No ${filter} events at the moment.`}
+      </Text>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={staticTheme.colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Image
-            source={require("../../assets/inlinelogo.jpg")}
-            style={styles.headerLogo}
-          />
-          <Text style={styles.title}>Events</Text>
+          <HeaderLogo />
         </View>
-        <IconButton
-          icon="magnify"
-          onPress={() => console.log("Search events")}
-        />
+        <View style={styles.headerActions}>
+          <IconButton
+            icon="magnify"
+            onPress={() => {
+              /* Search events functionality */
+            }}
+          />
+        </View>
       </View>
 
       <FilterChips />
+
+      <View style={styles.eventCount}>
+        <Text style={styles.eventCountText}>
+          {filteredEvents.length}{" "}
+          {filteredEvents.length === 1 ? "event" : "events"}
+          {filter !== "all" && ` (${filter})`}
+        </Text>
+      </View>
 
       <FlatList
         data={filteredEvents}
         renderItem={renderEvent}
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          filteredEvents.length === 0 && styles.emptyListContent,
+        ]}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+        ListEmptyComponent={<EmptyState />}
       />
 
       <FAB
@@ -114,7 +263,13 @@ const EventsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: staticTheme.colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: staticTheme.colors.background,
   },
   header: {
     flexDirection: "row",
@@ -123,22 +278,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: staticTheme.colors.border,
   },
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
   },
-  headerLogo: {
-    width: 32,
-    height: 32,
-    resizeMode: "contain",
-    marginRight: spacing.sm,
-  },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: theme.colors.text,
+    color: staticTheme.colors.text,
+  },
+  headerActions: {
+    flexDirection: "row",
   },
   filterContainer: {
     paddingHorizontal: spacing.md,
@@ -147,13 +299,28 @@ const styles = StyleSheet.create({
   filterChip: {
     marginRight: spacing.sm,
   },
+  eventCount: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  eventCountText: {
+    fontSize: 14,
+    color: staticTheme.colors.textSecondary,
+  },
   listContent: {
     padding: spacing.md,
+  },
+  emptyListContent: {
+    flex: 1,
+    justifyContent: "center",
   },
   eventCard: {
     marginBottom: spacing.md,
     padding: 0,
     overflow: "hidden",
+  },
+  pastEventCard: {
+    opacity: 0.7,
   },
   eventImage: {
     width: "100%",
@@ -162,16 +329,31 @@ const styles = StyleSheet.create({
   eventContent: {
     padding: spacing.md,
   },
+  eventHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: spacing.sm,
+  },
   eventTitle: {
+    flex: 1,
     fontSize: 18,
     fontWeight: "bold",
-    color: theme.colors.text,
-    marginBottom: spacing.sm,
+    color: staticTheme.colors.text,
+    marginRight: spacing.sm,
+  },
+  pastChip: {
+    backgroundColor: staticTheme.colors.textSecondary,
+  },
+  pastChipText: {
+    color: "#ffffff",
+    fontSize: 12,
   },
   eventDescription: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: staticTheme.colors.textSecondary,
     marginBottom: spacing.md,
+    lineHeight: 20,
   },
   eventMeta: {
     flexDirection: "row",
@@ -187,15 +369,43 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  eventStats: {
+    flex: 1,
+  },
   attendeesText: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    fontWeight: "600",
+    color: staticTheme.colors.text,
+  },
+  organizerText: {
+    fontSize: 12,
+    color: staticTheme.colors.textSecondary,
+    marginTop: spacing.xs / 2,
+  },
+  emptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.xxl,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: staticTheme.colors.text,
+    marginBottom: spacing.sm,
+    marginTop: spacing.md,
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: staticTheme.colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 24,
+    paddingHorizontal: spacing.lg,
   },
   fab: {
     position: "absolute",
     right: spacing.md,
     bottom: spacing.md,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: staticTheme.colors.primary,
   },
 });
 

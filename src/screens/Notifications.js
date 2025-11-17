@@ -1,10 +1,23 @@
-import React, { useState } from "react";
-import { View, StyleSheet, FlatList, Image } from "react-native";
-import { Text, IconButton, Avatar, Chip } from "react-native-paper";
+import React, { useState, useEffect } from "react";
+import { View, StyleSheet, FlatList, Image, Alert } from "react-native";
+import {
+  Text,
+  IconButton,
+  Avatar,
+  Chip,
+  ActivityIndicator,
+} from "react-native-paper";
 import { Card } from "../components";
-import { theme, spacing } from "../constants";
+import { theme as staticTheme, spacing } from "../constants";
+import { useAuth } from "../contexts/AuthContext";
+import { notificationService, userService } from "../services/firebase";
 
-const NotificationItem = ({ notification }) => {
+const NotificationItem = ({ notification, onPress, users }) => {
+  const notificationUser = users[notification.fromUserId] || {
+    fullName: "Unknown User",
+    avatar: null,
+  };
+
   const getIcon = () => {
     switch (notification.type) {
       case "like":
@@ -15,6 +28,8 @@ const NotificationItem = ({ notification }) => {
         return "account-plus";
       case "event":
         return "calendar";
+      case "story":
+        return "camera";
       default:
         return "bell";
     }
@@ -23,37 +38,87 @@ const NotificationItem = ({ notification }) => {
   const getIconColor = () => {
     switch (notification.type) {
       case "like":
-        return theme.colors.error;
+        return staticTheme.colors.error;
       case "comment":
-        return theme.colors.primary;
+        return staticTheme.colors.primary;
       case "follow":
-        return theme.colors.success;
+        return "#4CAF50";
       case "event":
-        return theme.colors.secondary;
+        return "#FF9800";
+      case "story":
+        return "#9C27B0";
       default:
-        return theme.colors.textSecondary;
+        return staticTheme.colors.textSecondary;
     }
   };
 
+  const getMessage = () => {
+    switch (notification.type) {
+      case "like":
+        return "liked your post";
+      case "comment":
+        return "commented on your post";
+      case "follow":
+        return "started following you";
+      case "event":
+        return "is interested in your event";
+      case "story":
+        return "viewed your story";
+      default:
+        return notification.message || "sent you a notification";
+    }
+  };
+
+  const getTimeAgo = () => {
+    if (!notification.createdAt) return "";
+
+    const now = new Date();
+    const notificationDate =
+      notification.createdAt instanceof Date
+        ? notification.createdAt
+        : new Date(notification.createdAt);
+    const diffInSeconds = Math.floor((now - notificationDate) / 1000);
+
+    if (diffInSeconds < 60) return "Just now";
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
+    return `${Math.floor(diffInSeconds / 86400)}d`;
+  };
+
   return (
-    <Card style={styles.notificationCard}>
+    <Card
+      style={[
+        styles.notificationCard,
+        !notification.read && styles.unreadNotification,
+      ]}
+    >
       <View style={styles.notificationContent}>
-        <View style={styles.notificationLeft}>
-          <Avatar.Image source={{ uri: notification.avatar }} size={40} />
+        <Avatar.Image
+          source={{
+            uri:
+              notificationUser.avatar ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                notificationUser.fullName || "User"
+              )}&background=702963&color=fff`,
+          }}
+          size={50}
+        />
+
+        <View style={styles.notificationBody}>
+          <View style={styles.notificationMain}>
+            <Text style={styles.notificationText}>
+              <Text style={styles.userName}>{notificationUser.fullName}</Text>{" "}
+              <Text style={styles.actionText}>{getMessage()}</Text>
+            </Text>
+            <Text style={styles.timeText}>{getTimeAgo()}</Text>
+          </View>
+
           <IconButton
             icon={getIcon()}
             iconColor={getIconColor()}
-            size={16}
+            size={20}
             style={styles.notificationIcon}
           />
-        </View>
-
-        <View style={styles.notificationInfo}>
-          <Text style={styles.notificationText}>
-            <Text style={styles.userName}>{notification.userName}</Text>{" "}
-            {notification.message}
-          </Text>
-          <Text style={styles.timeText}>{notification.time}</Text>
         </View>
 
         {!notification.read && <View style={styles.unreadIndicator} />}
@@ -63,45 +128,116 @@ const NotificationItem = ({ notification }) => {
 };
 
 const NotificationsScreen = ({ navigation }) => {
+  const { user } = useAuth();
   const [filter, setFilter] = useState("all");
-  const [notifications] = useState([
-    {
-      id: 1,
-      type: "like",
-      userName: "John Doe",
-      avatar: "https://i.pravatar.cc/150?img=1",
-      message: "liked your post",
-      time: "5m ago",
-      read: false,
-    },
-    {
-      id: 2,
-      type: "comment",
-      userName: "Jane Smith",
-      avatar: "https://i.pravatar.cc/150?img=2",
-      message: "commented on your post",
-      time: "1h ago",
-      read: true,
-    },
-    {
-      id: 3,
-      type: "follow",
-      userName: "Mike Johnson",
-      avatar: "https://i.pravatar.cc/150?img=3",
-      message: "started following you",
-      time: "2h ago",
-      read: false,
-    },
-    {
-      id: 4,
-      type: "event",
-      userName: "Sarah Wilson",
-      avatar: "https://i.pravatar.cc/150?img=4",
-      message: "invited you to an event",
-      time: "1d ago",
-      read: true,
-    },
-  ]);
+  const [notifications, setNotifications] = useState([]);
+  const [users, setUsers] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadNotifications();
+  }, []);
+
+  const loadNotifications = async () => {
+    try {
+      setLoading(true);
+
+      // Subscribe to real-time notifications
+      const unsubscribe = notificationService.subscribeToNotifications(
+        user.uid,
+        async (notificationsData) => {
+          setNotifications(notificationsData);
+
+          // Load user data for notifications
+          const userIds = [
+            ...new Set(notificationsData.map((n) => n.fromUserId)),
+          ];
+          const usersData = {};
+
+          await Promise.all(
+            userIds.map(async (userId) => {
+              try {
+                const userData = await userService.getUser(userId);
+                if (userData) {
+                  usersData[userId] = userData;
+                }
+              } catch (error) {
+                console.error(`Error loading user ${userId}:`, error);
+              }
+            })
+          );
+
+          setUsers(usersData);
+          setLoading(false);
+        }
+      );
+
+      return () => unsubscribe?.();
+    } catch (error) {
+      console.error("Error loading notifications:", error);
+      Alert.alert("Error", "Failed to load notifications");
+      setLoading(false);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const unreadNotifications = notifications.filter((n) => !n.read);
+
+      await Promise.all(
+        unreadNotifications.map((notification) =>
+          notificationService.markNotificationAsRead(notification.id)
+        )
+      );
+
+      setNotifications((prev) =>
+        prev.map((notification) => ({ ...notification, read: true }))
+      );
+    } catch (error) {
+      console.error("Error marking all as read:", error);
+      Alert.alert("Error", "Failed to mark notifications as read");
+    }
+  };
+
+  const handleNotificationPress = async (notification) => {
+    try {
+      // Mark as read if not already read
+      if (!notification.read) {
+        await notificationService.markNotificationAsRead(notification.id);
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
+        );
+      }
+
+      // Navigate based on notification type
+      switch (notification.type) {
+        case "like":
+        case "comment":
+          if (notification.postId) {
+            navigation.navigate("Comments", {
+              post: { id: notification.postId },
+            });
+          }
+          break;
+        case "follow":
+          navigation.navigate("UserProfile", {
+            user: users[notification.fromUserId],
+          });
+          break;
+        case "event":
+          if (notification.eventId) {
+            navigation.navigate("EventDetail", {
+              event: { id: notification.eventId },
+            });
+          }
+          break;
+        default:
+          break;
+      }
+    } catch (error) {
+      console.error("Error handling notification press:", error);
+    }
+  };
 
   const filteredNotifications = notifications.filter((notification) => {
     if (filter === "all") return true;
@@ -110,8 +246,20 @@ const NotificationsScreen = ({ navigation }) => {
   });
 
   const renderNotification = ({ item }) => (
-    <NotificationItem notification={item} />
+    <NotificationItem
+      notification={item}
+      users={users}
+      onPress={() => handleNotificationPress(item)}
+    />
   );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={staticTheme.colors.primary} />
+      </View>
+    );
+  }
 
   const FilterChips = () => (
     <View style={styles.filterContainer}>
@@ -138,10 +286,7 @@ const NotificationsScreen = ({ navigation }) => {
           />
           <Text style={styles.title}>Notifications</Text>
         </View>
-        <IconButton
-          icon="check-all"
-          onPress={() => console.log("Mark all as read")}
-        />
+        <IconButton icon="check-all" onPress={handleMarkAllAsRead} />
       </View>
 
       <FilterChips />
@@ -160,7 +305,7 @@ const NotificationsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: staticTheme.colors.background,
   },
   header: {
     flexDirection: "row",
@@ -169,7 +314,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: staticTheme.colors.border,
   },
   headerLeft: {
     flexDirection: "row",
@@ -184,14 +329,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: theme.colors.text,
+    color: staticTheme.colors.text,
   },
   filterContainer: {
     flexDirection: "row",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: staticTheme.colors.border,
   },
   filterChip: {
     marginRight: spacing.sm,
@@ -207,6 +352,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  notificationBody: {
+    flex: 1,
+    marginLeft: spacing.md,
+  },
+  notificationMain: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  notificationText: {
+    fontSize: 14,
+    color: staticTheme.colors.text,
+    lineHeight: 20,
+    flex: 1,
+  },
+  actionText: {
+    color: staticTheme.colors.textSecondary,
+  },
   notificationLeft: {
     position: "relative",
     marginRight: spacing.md,
@@ -215,31 +378,36 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: -8,
     right: -8,
-    backgroundColor: theme.colors.background,
+    backgroundColor: staticTheme.colors.background,
     margin: 0,
   },
   notificationInfo: {
     flex: 1,
-  },
-  notificationText: {
-    fontSize: 14,
-    color: theme.colors.text,
-    lineHeight: 20,
   },
   userName: {
     fontWeight: "600",
   },
   timeText: {
     fontSize: 12,
-    color: theme.colors.textSecondary,
+    color: staticTheme.colors.textSecondary,
     marginTop: spacing.xs,
+  },
+  unreadNotification: {
+    borderLeftWidth: 3,
+    borderLeftColor: staticTheme.colors.primary,
   },
   unreadIndicator: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: staticTheme.colors.primary,
     marginLeft: spacing.sm,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: staticTheme.colors.background,
   },
 });
 

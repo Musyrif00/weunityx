@@ -1,7 +1,12 @@
 import React from "react";
 import { View, Image, StyleSheet, TouchableOpacity } from "react-native";
 import { Text, IconButton } from "react-native-paper";
-import { theme, spacing, borderRadius } from "../constants/theme";
+import {
+  theme as staticTheme,
+  spacing,
+  borderRadius,
+} from "../constants/theme";
+import { useTheme } from "../contexts/ThemeContext";
 
 const User = ({
   user,
@@ -12,6 +17,11 @@ const User = ({
   size = "medium",
   style,
 }) => {
+  // Always use light theme (disabled dynamic theming)
+  const currentTheme = staticTheme;
+
+  // Text should now be visible with explicit colors
+
   const avatarSize = {
     small: 40,
     medium: 50,
@@ -19,41 +29,47 @@ const User = ({
   }[size];
 
   const UserContent = (
-    <View style={[styles.container, style]}>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 8,
+        flex: 1,
+      }}
+    >
       <Image
         source={{ uri: user.avatar }}
-        style={[
-          styles.avatar,
-          {
-            width: avatarSize,
-            height: avatarSize,
-            borderRadius: avatarSize / 2,
-          },
-        ]}
+        style={{
+          width: avatarSize,
+          height: avatarSize,
+          borderRadius: avatarSize / 2,
+          marginRight: 12,
+        }}
       />
-      <View style={styles.info}>
-        <View style={styles.nameRow}>
-          <Text style={styles.name}>{user.name}</Text>
-          {user.verified && (
-            <IconButton
-              icon="check-circle"
-              iconColor={theme.colors.primary}
-              size={16}
-              style={styles.verifiedIcon}
-            />
-          )}
-        </View>
-        <Text style={styles.username}>@{user.username}</Text>
-        {showBio && user.bio && <Text style={styles.bio}>{user.bio}</Text>}
-      </View>
-      {showFollowButton && (
-        <TouchableOpacity
-          style={styles.followButton}
-          onPress={() => onFollowPress?.(user)}
+      <View
+        style={{
+          flex: 1,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 16,
+            fontWeight: "600",
+            color: "#000000",
+          }}
         >
-          <Text style={styles.followText}>Follow</Text>
-        </TouchableOpacity>
-      )}
+          {user?.fullName || user?.displayName || "Unknown User"}
+        </Text>
+        <Text
+          style={{
+            fontSize: 14,
+            color: "#666666",
+            marginTop: 2,
+          }}
+        >
+          @{user?.username || user?.email?.split("@")[0] || "unknown"}
+        </Text>
+      </View>
     </View>
   );
 
@@ -73,38 +89,48 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: spacing.sm,
+    flex: 1,
+    minWidth: 0, // Allow shrinking
   },
   avatar: {
     marginRight: spacing.md,
+    flexShrink: 0, // Prevent avatar from shrinking
   },
   info: {
     flex: 1,
+    justifyContent: "center",
+    minWidth: 0, // Allow shrinking for text overflow
   },
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
+    flex: 1,
   },
   name: {
     fontSize: 16,
     fontWeight: "600",
-    color: theme.colors.text,
+    // Note: color will be applied inline with dynamic theme
+    minHeight: 20,
+    flex: 1, // Allow text to take available space
   },
   verifiedIcon: {
     margin: 0,
     marginLeft: spacing.xs / 2,
+    flexShrink: 0, // Prevent icon from shrinking
   },
   username: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    // Note: color will be applied inline with dynamic theme
     marginTop: spacing.xs / 2,
+    minHeight: 18,
   },
   bio: {
     fontSize: 14,
-    color: theme.colors.text,
+    // Note: color will be applied inline with dynamic theme
     marginTop: spacing.xs,
   },
   followButton: {
-    backgroundColor: theme.colors.primary,
+    // Note: backgroundColor will be applied inline with dynamic theme
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,

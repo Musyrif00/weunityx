@@ -1,7 +1,12 @@
 import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { TextInput as PaperTextInput, HelperText } from "react-native-paper";
-import { theme, spacing, borderRadius } from "../constants/theme";
+import {
+  theme as staticTheme,
+  spacing,
+  borderRadius,
+} from "../constants/theme";
+import { useTheme } from "../contexts/ThemeContext";
 
 const Input = ({
   label,
@@ -18,6 +23,8 @@ const Input = ({
   style,
   ...props
 }) => {
+  // Always use light theme (disabled dynamic theming)
+  const theme = staticTheme;
   const [isFocused, setIsFocused] = useState(false);
 
   return (
@@ -40,13 +47,13 @@ const Input = ({
           styles.input,
           {
             backgroundColor: disabled
-              ? theme.colors.surface
-              : theme.colors.background,
+              ? staticTheme.colors.surface
+              : staticTheme.colors.background,
             borderColor: error
-              ? theme.colors.error
+              ? staticTheme.colors.error
               : isFocused
-              ? theme.colors.primary
-              : theme.colors.border,
+              ? staticTheme.colors.primary
+              : staticTheme.colors.border,
           },
         ]}
         contentStyle={styles.inputContent}

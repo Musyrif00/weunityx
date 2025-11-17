@@ -1,12 +1,60 @@
-import React from "react";
-import { View, StyleSheet, ScrollView, Image } from "react-native";
-import { Text, IconButton, Button, Divider } from "react-native-paper";
-import { Card } from "../../components";
-import { theme, spacing } from "../../constants";
+import React, { useState, useEffect } from "react";
+import { View, StyleSheet, ScrollView, Image, Alert } from "react-native";
+import {
+  Text,
+  IconButton,
+  Button,
+  Divider,
+  ActivityIndicator,
+} from "react-native-paper";
+import { Card, HeaderLogo } from "../../components";
+import { theme as staticTheme, spacing } from "../../constants";
 import { useAuth } from "../../contexts/AuthContext";
+import { userService, postService } from "../../services/firebase";
 
 const ProfileScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
+  const [userProfile, setUserProfile] = useState(null);
+  const [userPosts, setUserPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user?.uid) {
+      loadUserData();
+    }
+  }, [user?.uid]);
+
+  const loadUserData = async () => {
+    try {
+      setLoading(true);
+
+      // Load user profile data
+      const profile = await userService.getUser(user.uid);
+
+      // Ensure profile has default values
+      const safeProfile = {
+        ...profile,
+        followers: profile?.followers || [],
+        following: profile?.following || [],
+        followersCount: profile?.followersCount || 0,
+        followingCount: profile?.followingCount || 0,
+        bio: profile?.bio || "Welcome to my WeUnityX profile! 🚀",
+        fullName: profile?.fullName || user?.displayName || "User",
+        avatar: profile?.avatar || user?.photoURL,
+      };
+
+      setUserProfile(safeProfile);
+
+      // Load user posts
+      const posts = await postService.getUserPosts(user.uid);
+      setUserPosts(posts);
+    } catch (error) {
+      console.error("Error loading user data:", error);
+      Alert.alert("Error", "Failed to load profile data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -27,11 +75,7 @@ const ProfileScreen = ({ navigation }) => {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Image
-            source={require("../../../assets/inlinelogo.jpg")}
-            style={styles.headerLogo}
-          />
-          <Text style={styles.title}>Profile</Text>
+          <HeaderLogo />
         </View>
         <View style={styles.headerActions}>
           <IconButton
@@ -43,34 +87,59 @@ const ProfileScreen = ({ navigation }) => {
       </View>
 
       <Card style={styles.profileCard}>
-        <View style={styles.profileHeader}>
-          <Image
-            source={{
-              uri:
-                user?.photoURL ||
-                `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                  user?.displayName || "User"
-                )}&background=6366f1&color=fff`,
-            }}
-            style={styles.avatar}
-          />
-          <View style={styles.profileInfo}>
-            <Text style={styles.name}>{user?.displayName || "User"}</Text>
-            <Text style={styles.email}>{user?.email}</Text>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator
+              size="large"
+              color={staticTheme.colors.primary}
+            />
           </View>
-          <IconButton
-            icon="pencil"
-            onPress={() => navigation.navigate("EditProfile")}
-          />
-        </View>
+        ) : (
+          <>
+            <View style={styles.profileHeader}>
+              <Image
+                source={{
+                  uri:
+                    userProfile?.avatar ||
+                    user?.photoURL ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                      userProfile?.fullName || user?.displayName || "User"
+                    )}&background=702963&color=fff`,
+                }}
+                style={styles.avatar}
+              />
+              <View style={styles.profileInfo}>
+                <Text style={styles.name}>
+                  {userProfile?.fullName || user?.displayName || "User"}
+                </Text>
+                <Text style={styles.email}>{user?.email}</Text>
+                {userProfile?.username && (
+                  <Text style={styles.username}>@{userProfile.username}</Text>
+                )}
+              </View>
+              <IconButton
+                icon="pencil"
+                onPress={() => navigation.navigate("EditProfile")}
+              />
+            </View>
 
-        <View style={styles.stats}>
-          <StatItem label="Posts" value="12" />
-          <StatItem label="Followers" value="234" />
-          <StatItem label="Following" value="89" />
-        </View>
+            <View style={styles.stats}>
+              <StatItem label="Posts" value={userPosts.length || 0} />
+              <StatItem
+                label="Followers"
+                value={userProfile?.followersCount || 0}
+              />
+              <StatItem
+                label="Following"
+                value={userProfile?.followingCount || 0}
+              />
+            </View>
 
-        <Text style={styles.bio}>Welcome to my WeUnityX profile! 🚀</Text>
+            <Text style={styles.bio}>
+              {userProfile?.bio || "Welcome to my WeUnityX profile! 🚀"}
+            </Text>
+          </>
+        )}
       </Card>
 
       <Card style={styles.menuCard}>
@@ -90,7 +159,10 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.menuItem}>
           <IconButton icon="bookmark" />
           <Text style={styles.menuText}>Saved Posts</Text>
-          <IconButton icon="chevron-right" />
+          <IconButton
+            icon="chevron-right"
+            onPress={() => navigation.navigate("SavedPosts")}
+          />
         </View>
 
         <Divider />
@@ -119,7 +191,12 @@ const ProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: staticTheme.colors.background,
+  },
+  loadingContainer: {
+    padding: spacing.xl,
+    alignItems: "center",
+    justifyContent: "center",
   },
   header: {
     flexDirection: "row",
@@ -128,22 +205,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: staticTheme.colors.border,
   },
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
   },
   headerLogo: {
-    width: 32,
-    height: 32,
+    width: 100,
+    height: 28,
     resizeMode: "contain",
-    marginRight: spacing.sm,
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: theme.colors.text,
+    color: staticTheme.colors.text,
   },
   headerActions: {
     flexDirection: "row",
@@ -166,14 +242,19 @@ const styles = StyleSheet.create({
     marginLeft: spacing.md,
   },
   name: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "bold",
-    color: theme.colors.text,
+    color: staticTheme.colors.text,
     marginBottom: spacing.xs,
   },
   email: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: staticTheme.colors.textSecondary,
+  },
+  username: {
+    fontSize: 14,
+    color: staticTheme.colors.textSecondary,
+    marginTop: spacing.xs,
   },
   stats: {
     flexDirection: "row",
@@ -186,16 +267,16 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 20,
     fontWeight: "bold",
-    color: theme.colors.text,
+    color: staticTheme.colors.text,
   },
   statLabel: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: staticTheme.colors.textSecondary,
     marginTop: spacing.xs,
   },
   bio: {
     fontSize: 16,
-    color: theme.colors.text,
+    color: staticTheme.colors.text,
     lineHeight: 24,
   },
   menuCard: {
@@ -205,7 +286,7 @@ const styles = StyleSheet.create({
   menuTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: theme.colors.text,
+    color: staticTheme.colors.text,
     marginBottom: spacing.md,
   },
   menuItem: {
@@ -216,7 +297,7 @@ const styles = StyleSheet.create({
   menuText: {
     flex: 1,
     fontSize: 16,
-    color: theme.colors.text,
+    color: staticTheme.colors.text,
   },
 });
 

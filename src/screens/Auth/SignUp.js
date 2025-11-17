@@ -12,7 +12,7 @@ import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
 import { Button, Input } from "../../components";
-import { theme, spacing } from "../../constants/theme";
+import { theme as staticTheme, spacing } from "../../constants/theme";
 
 const SignUpScreen = ({ navigation }) => {
   const [formData, setFormData] = useState({
@@ -90,7 +90,7 @@ const SignUpScreen = ({ navigation }) => {
         email: formData.email.trim().toLowerCase(),
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
           formData.fullName
-        )}&background=6366f1&color=fff`,
+        )}&background=702963&color=fff`,
         bio: "",
         verified: false,
         followers: 0,
@@ -134,7 +134,7 @@ const SignUpScreen = ({ navigation }) => {
           <IconButton
             icon="arrow-left"
             size={24}
-            iconColor={theme.colors.text}
+            iconColor={staticTheme.colors.text}
             onPress={() => navigation.goBack()}
             style={styles.backButton}
           />
@@ -221,7 +221,7 @@ const SignUpScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: staticTheme.colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -240,12 +240,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "bold",
-    color: theme.colors.text,
+    color: staticTheme.colors.text,
     marginBottom: spacing.sm,
   },
   subtitle: {
     fontSize: 16,
-    color: theme.colors.textSecondary,
+    color: staticTheme.colors.textSecondary,
     textAlign: "center",
   },
   form: {
@@ -261,10 +261,10 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 16,
-    color: theme.colors.textSecondary,
+    color: staticTheme.colors.textSecondary,
   },
   linkText: {
-    color: theme.colors.primary,
+    color: staticTheme.colors.primary,
     fontWeight: "600",
   },
 });

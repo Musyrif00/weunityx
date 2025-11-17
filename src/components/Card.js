@@ -1,7 +1,13 @@
 import React from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { Card as PaperCard, Text } from "react-native-paper";
-import { theme, spacing, borderRadius, shadows } from "../constants/theme";
+import {
+  theme as staticTheme,
+  spacing,
+  borderRadius,
+  shadows,
+} from "../constants/theme";
+import { useTheme } from "../contexts/ThemeContext";
 
 const Card = ({
   children,
@@ -13,6 +19,9 @@ const Card = ({
   padding = "md",
   ...props
 }) => {
+  // Always use light theme (disabled dynamic theming)
+  const theme = staticTheme;
+
   const paddingValue = {
     sm: spacing.sm,
     md: spacing.md,
@@ -27,7 +36,7 @@ const Card = ({
         shadows[elevation],
         {
           padding: paddingValue,
-          backgroundColor: theme.colors.background,
+          backgroundColor: staticTheme.colors.background,
           borderRadius: borderRadius.lg,
         },
         style,
@@ -58,7 +67,7 @@ const styles = StyleSheet.create({
   container: {
     marginVertical: spacing.xs,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: staticTheme.colors.border,
   },
   header: {
     marginBottom: spacing.md,
@@ -66,12 +75,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: "600",
-    color: theme.colors.text,
+    color: staticTheme.colors.text,
     marginBottom: spacing.xs / 2,
   },
   subtitle: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: staticTheme.colors.textSecondary,
   },
 });
 

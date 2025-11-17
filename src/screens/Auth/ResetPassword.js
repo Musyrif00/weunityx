@@ -4,7 +4,7 @@ import { Text, IconButton } from "react-native-paper";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../../config/firebase";
 import { Button, Input } from "../../components";
-import { theme, spacing } from "../../constants/theme";
+import { theme as staticTheme, spacing } from "../../constants/theme";
 
 const ResetPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
@@ -67,7 +67,7 @@ const ResetPasswordScreen = ({ navigation }) => {
           <IconButton
             icon="check-circle"
             size={64}
-            iconColor={theme.colors.success}
+            iconColor={staticTheme.colors.success}
           />
           <Text style={styles.title}>Email Sent!</Text>
           <Text style={styles.subtitle}>
@@ -90,7 +90,7 @@ const ResetPasswordScreen = ({ navigation }) => {
         <IconButton
           icon="arrow-left"
           size={24}
-          iconColor={theme.colors.text}
+          iconColor={staticTheme.colors.text}
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         />
@@ -135,7 +135,7 @@ const ResetPasswordScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: staticTheme.colors.background,
     padding: spacing.lg,
   },
   header: {
@@ -151,12 +151,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "bold",
-    color: theme.colors.text,
+    color: staticTheme.colors.text,
     marginBottom: spacing.sm,
   },
   subtitle: {
     fontSize: 16,
-    color: theme.colors.textSecondary,
+    color: staticTheme.colors.textSecondary,
     textAlign: "center",
     lineHeight: 24,
   },

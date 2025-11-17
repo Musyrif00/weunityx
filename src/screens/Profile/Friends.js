@@ -1,7 +1,7 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
 import { Text } from "react-native-paper";
-import { theme, spacing } from "../../constants";
+import { theme as staticTheme, spacing } from "../../constants";
 
 const FriendsScreen = () => {
   return (
@@ -17,19 +17,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: theme.colors.background,
+    backgroundColor: staticTheme.colors.background,
     padding: spacing.md,
   },
   placeholder: {
     fontSize: 18,
     fontWeight: "bold",
-    color: theme.colors.text,
+    color: staticTheme.colors.text,
     textAlign: "center",
     marginBottom: spacing.md,
   },
   subtext: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: staticTheme.colors.textSecondary,
     textAlign: "center",
   },
 });

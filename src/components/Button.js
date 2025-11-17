@@ -1,7 +1,12 @@
 import React from "react";
 import { TouchableOpacity, StyleSheet } from "react-native";
 import { Button as PaperButton } from "react-native-paper";
-import { theme, spacing, borderRadius } from "../constants/theme";
+import {
+  theme as staticTheme,
+  spacing,
+  borderRadius,
+} from "../constants/theme";
+import { useTheme } from "../contexts/ThemeContext";
 
 const Button = ({
   mode = "contained",
@@ -14,6 +19,9 @@ const Button = ({
   onPress,
   ...props
 }) => {
+  // Always use light theme (disabled dynamic theming)
+  const theme = staticTheme;
+
   const getButtonStyles = () => {
     const baseStyle = {
       borderRadius: borderRadius.lg,
@@ -28,18 +36,18 @@ const Button = ({
     const variantStyles = {
       primary: {
         backgroundColor:
-          mode === "contained" ? theme.colors.primary : "transparent",
-        borderColor: theme.colors.primary,
+          mode === "contained" ? staticTheme.colors.primary : "transparent",
+        borderColor: staticTheme.colors.primary,
       },
       secondary: {
         backgroundColor:
-          mode === "contained" ? theme.colors.secondary : "transparent",
-        borderColor: theme.colors.secondary,
+          mode === "contained" ? staticTheme.colors.secondary : "transparent",
+        borderColor: staticTheme.colors.secondary,
       },
       danger: {
         backgroundColor:
-          mode === "contained" ? theme.colors.error : "transparent",
-        borderColor: theme.colors.error,
+          mode === "contained" ? staticTheme.colors.error : "transparent",
+        borderColor: staticTheme.colors.error,
       },
     };
 
@@ -47,16 +55,16 @@ const Button = ({
   };
 
   const getTextColor = () => {
-    if (disabled) return theme.colors.textSecondary;
+    if (disabled) return staticTheme.colors.textSecondary;
     if (mode === "contained") return "#ffffff";
 
     const colorMap = {
-      primary: theme.colors.primary,
-      secondary: theme.colors.secondary,
-      danger: theme.colors.error,
+      primary: staticTheme.colors.primary,
+      secondary: staticTheme.colors.secondary,
+      danger: staticTheme.colors.error,
     };
 
-    return colorMap[variant] || theme.colors.primary;
+    return colorMap[variant] || staticTheme.colors.primary;
   };
 
   return (

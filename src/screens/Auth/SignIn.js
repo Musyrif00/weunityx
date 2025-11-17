@@ -6,14 +6,26 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Image,
 } from "react-native";
 import { Text, IconButton } from "react-native-paper";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../config/firebase";
 import { Button, Input } from "../../components";
-import { theme, spacing } from "../../constants/theme";
+import { theme as staticTheme, spacing } from "../../constants/theme";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const SignInScreen = ({ navigation }) => {
+  // Use theme hook with fallback to static theme
+  let theme = staticTheme;
+  try {
+    const themeContext = useTheme();
+    theme = themeContext?.theme || staticTheme;
+  } catch (error) {
+    // Use static theme as fallback
+    theme = staticTheme;
+  }
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -80,18 +92,16 @@ const SignInScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <IconButton
-            icon="arrow-left"
-            size={24}
-            iconColor={theme.colors.text}
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          />
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Sign in to your WeUnityX account</Text>
         </View>
 
         <View style={styles.form}>
+          <Image
+            source={require("../../../assets/logowithname.jpg")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Input
             label="Email Address"
             value={email}
@@ -148,7 +158,7 @@ const SignInScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: staticTheme.colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -167,17 +177,23 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "bold",
-    color: theme.colors.text,
+    color: staticTheme.colors.text,
     marginBottom: spacing.sm,
   },
   subtitle: {
     fontSize: 16,
-    color: theme.colors.textSecondary,
+    color: staticTheme.colors.textSecondary,
     textAlign: "center",
   },
   form: {
     flex: 1,
     justifyContent: "center",
+  },
+  logo: {
+    width: 300,
+    height: 300,
+    alignSelf: "center",
+    marginBottom: spacing.lg,
   },
   signInButton: {
     marginTop: spacing.lg,
@@ -192,10 +208,10 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 16,
-    color: theme.colors.textSecondary,
+    color: staticTheme.colors.textSecondary,
   },
   linkText: {
-    color: theme.colors.primary,
+    color: staticTheme.colors.primary,
     fontWeight: "600",
   },
 });
