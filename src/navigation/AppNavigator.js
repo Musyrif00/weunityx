@@ -13,6 +13,13 @@ import ProfileScreen from "../screens/Profile/MyProfile";
 import SearchScreen from "../screens/Search";
 import NotificationsScreen from "../screens/Notifications";
 
+// Wallet screens
+import {
+  WalletScreen,
+  TransactionHistory,
+  TokenDetail,
+} from "../screens/Wallet";
+
 // Auth screens
 import SignInScreen from "../screens/Auth/SignIn";
 import SignUpScreen from "../screens/Auth/SignUp";
@@ -94,6 +101,15 @@ const TabNavigator = () => {
         }}
       />
       <Tab.Screen
+        name="Wallet"
+        component={WalletScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <TabIcon name="wallet" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="Messages"
         component={MessagesScreen}
         options={{
@@ -171,6 +187,18 @@ const AppNavigator = () => {
           <Stack.Screen name="AddEvent" component={AddEventScreen} />
           <Stack.Screen name="SavedPosts" component={SavedPostsScreen} />
           <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
+          <Stack.Screen
+            name="TransactionHistory"
+            component={TransactionHistory}
+            options={{ title: "Transaction History" }}
+          />
+          <Stack.Screen
+            name="TokenDetail"
+            component={TokenDetail}
+            options={({ route }) => ({
+              title: route.params?.token?.symbol || "Token Details",
+            })}
+          />
         </>
       ) : (
         <Stack.Screen

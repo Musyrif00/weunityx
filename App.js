@@ -4,6 +4,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { Provider as PaperProvider } from "react-native-paper";
 import { AuthProvider } from "./src/contexts/AuthContext";
 import { ThemeProvider, lightTheme } from "./src/contexts/ThemeContext";
+import { WalletProvider } from "./src/contexts/WalletContext";
 import AppNavigator from "./src/navigation/AppNavigator";
 import PushNotificationService from "./src/services/pushNotifications";
 
@@ -42,10 +43,12 @@ const AppContent = () => {
   return (
     <PaperProvider theme={lightTheme}>
       <AuthProvider>
-        <NavigationContainer>
-          <StatusBar style="dark" />
-          <AppNavigator />
-        </NavigationContainer>
+        <WalletProvider>
+          <NavigationContainer>
+            <StatusBar style="dark" />
+            <AppNavigator />
+          </NavigationContainer>
+        </WalletProvider>
       </AuthProvider>
     </PaperProvider>
   );
