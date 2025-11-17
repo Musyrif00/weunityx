@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, FlatList } from "react-native";
+import { View, StyleSheet, FlatList, Image } from "react-native";
 import { Text, Searchbar, Chip } from "react-native-paper";
 import { User } from "../components";
 import { theme, spacing, mockUsers } from "../constants";
@@ -52,6 +52,12 @@ const SearchScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
+      <View style={styles.logoContainer}>
+        <Image
+          source={require("../../assets/inlinelogo.jpg")}
+          style={styles.headerLogo}
+        />
+      </View>
       <View style={styles.searchContainer}>
         <Searchbar
           placeholder="Search WeUnityX"
@@ -93,6 +99,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  logoContainer: {
+    alignItems: "center",
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  headerLogo: {
+    width: 120,
+    height: 40,
+    resizeMode: "contain",
   },
   searchContainer: {
     padding: spacing.md,

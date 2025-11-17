@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, FlatList } from "react-native";
+import { View, StyleSheet, FlatList, Image } from "react-native";
 import { Text, IconButton, Avatar, Chip } from "react-native-paper";
 import { Card } from "../components";
 import { theme, spacing } from "../constants";
@@ -131,7 +131,13 @@ const NotificationsScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Notifications</Text>
+        <View style={styles.headerLeft}>
+          <Image
+            source={require("../../assets/inlinelogo.jpg")}
+            style={styles.headerLogo}
+          />
+          <Text style={styles.title}>Notifications</Text>
+        </View>
         <IconButton
           icon="check-all"
           onPress={() => console.log("Mark all as read")}
@@ -164,6 +170,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerLogo: {
+    width: 32,
+    height: 32,
+    resizeMode: "contain",
+    marginRight: spacing.sm,
   },
   title: {
     fontSize: 24,

@@ -4,12 +4,22 @@
     "slug": "weunityx",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/logowithname.jpg",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/logosplash.jpg",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/logowithname.jpg",
+        "backgroundColor": "#FFFFFF"
+      },
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -18,7 +28,8 @@
       ]
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "favicon": "./assets/logowithname.jpg"
     }
   }
 }

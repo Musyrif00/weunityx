@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, FlatList } from "react-native";
+import { View, StyleSheet, FlatList, Image } from "react-native";
 import { Text, IconButton, Avatar, Badge } from "react-native-paper";
 import { Card } from "../../components";
 import { theme, spacing, mockUsers } from "../../constants";
@@ -60,7 +60,13 @@ const MessagesListScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Messages</Text>
+        <View style={styles.headerLeft}>
+          <Image
+            source={require("../../../assets/inlinelogo.jpg")}
+            style={styles.headerLogo}
+          />
+          <Text style={styles.title}>Messages</Text>
+        </View>
         <View style={styles.headerActions}>
           <IconButton
             icon="magnify"
@@ -97,6 +103,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerLogo: {
+    width: 32,
+    height: 32,
+    resizeMode: "contain",
+    marginRight: spacing.sm,
   },
   title: {
     fontSize: 24,

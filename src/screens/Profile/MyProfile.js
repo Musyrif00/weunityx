@@ -26,7 +26,13 @@ const ProfileScreen = ({ navigation }) => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Profile</Text>
+        <View style={styles.headerLeft}>
+          <Image
+            source={require("../../../assets/inlinelogo.jpg")}
+            style={styles.headerLogo}
+          />
+          <Text style={styles.title}>Profile</Text>
+        </View>
         <View style={styles.headerActions}>
           <IconButton
             icon="cog"
@@ -123,6 +129,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerLogo: {
+    width: 32,
+    height: 32,
+    resizeMode: "contain",
+    marginRight: spacing.sm,
   },
   title: {
     fontSize: 24,

@@ -86,7 +86,10 @@ const HomeScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>WeUnityX</Text>
+        <Image
+          source={require("../../assets/inlinelogo.jpg")}
+          style={styles.headerLogo}
+        />
         <View style={styles.headerActions}>
           <IconButton
             icon="plus"
@@ -131,6 +134,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
     color: theme.colors.text,
+  },
+  headerLogo: {
+    width: 120,
+    height: 40,
+    resizeMode: "contain",
   },
   headerActions: {
     flexDirection: "row",
