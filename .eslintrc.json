@@ -1,0 +1,8 @@
+{
+  "extends": ["expo", "@expo/eslint-config/base"],
+  "rules": {
+    "prettier/prettier": 0,
+    "@typescript-eslint/no-unused-vars": "warn",
+    "react-hooks/exhaustive-deps": "warn"
+  }
+}
