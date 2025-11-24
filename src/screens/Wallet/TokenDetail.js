@@ -23,7 +23,11 @@ import { theme } from "../../constants/theme";
 const { width } = Dimensions.get("window");
 
 const TokenDetailScreen = ({ route, navigation }) => {
-  const { token, chain } = route.params;
+  const { token: tokenParam, chain } = route.params;
+
+  // Provide default values if token is undefined or missing properties
+  const token = tokenParam || {};
+
   const { getTokenPrice, refreshWalletData } = useWallet();
 
   const [tokenPrice, setTokenPrice] = useState(null);
@@ -54,14 +58,21 @@ const TokenDetailScreen = ({ route, navigation }) => {
   }, []);
 
   const loadTokenPrice = async () => {
-    if (!token.address) return; // Skip for native tokens
+    // Skip for native tokens (no contract address or address is "native")
+    if (
+      !token.address ||
+      token.address === "native" ||
+      token.address === "0x0"
+    ) {
+      return;
+    }
 
     try {
       setIsLoading(true);
       const price = await getTokenPrice(token.address, chain.chainId);
       setTokenPrice(price);
     } catch (error) {
-      console.error("Error loading token price:", error);
+      // Silently handle price fetch errors
     } finally {
       setIsLoading(false);
     }
@@ -89,6 +100,18 @@ const TokenDetailScreen = ({ route, navigation }) => {
     return `$${value.toFixed(2)}`;
   };
 
+  // If no token data is available, show error state
+  if (!tokenParam) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Text style={styles.errorText}>Token data not available</Text>
+        <Button mode="outlined" onPress={() => navigation.goBack()}>
+          Go Back
+        </Button>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -100,7 +123,10 @@ const TokenDetailScreen = ({ route, navigation }) => {
         {/* Header Card */}
         <Card style={styles.headerCard}>
           <LinearGradient
-            colors={[theme.colors.primary, theme.colors.primaryDark]}
+            colors={[
+              theme.colors.primary,
+              theme.colors.primaryDark || theme.colors.primary,
+            ]}
             style={styles.gradient}
           >
             <View style={styles.header}>
@@ -397,6 +423,17 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontStyle: "italic",
     paddingVertical: 20,
+  },
+  centerContent: {
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: theme.colors.error,
+    textAlign: "center",
+    marginBottom: 20,
   },
 });
 

@@ -6,6 +6,7 @@ import {
   RefreshControl,
   Alert,
   Dimensions,
+  Image,
 } from "react-native";
 import {
   Text,
@@ -78,7 +79,23 @@ const WalletScreen = ({ navigation }) => {
 
   // Handle token press
   const handleTokenPress = (token) => {
-    navigation.navigate("TokenDetail", { token, chain: getCurrentChain() });
+    // Ensure token has the required properties for TokenDetail screen
+    if (!token) return;
+
+    // For native tokens, create a proper token structure
+    const normalizedToken = {
+      name: token.name || currentChain?.name || "Native Token",
+      symbol: token.symbol || currentChain?.symbol || "ETH",
+      formatted: token.formatted || "0",
+      logo: token.logo || null,
+      address: token.address || "native",
+      ...token,
+    };
+
+    navigation.navigate("TokenDetail", {
+      token: normalizedToken,
+      chain: getCurrentChain(),
+    });
   };
 
   // Copy address to clipboard
@@ -115,28 +132,39 @@ const WalletScreen = ({ navigation }) => {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
+        {/* Network Selector */}
+        <View style={styles.networkContainer}>
+          <Text style={styles.networkLabel}>Network</Text>
+          <Button
+            mode="outlined"
+            onPress={() => setShowChainSelector(true)}
+            icon="chevron-down"
+            style={styles.networkButton}
+            labelStyle={styles.networkButtonLabel}
+          >
+            {currentChain?.name || "Select Network"}
+          </Button>
+        </View>
+
         {/* Header Card with Balance */}
         <Card style={styles.headerCard}>
           <LinearGradient
-            colors={[theme.colors.primary, theme.colors.primaryDark]}
+            colors={[
+              "#4c1d95", // More vibrant purple
+              "#7c3aed", // Lighter purple for better contrast
+              "#8b5cf6", // Even lighter for nice gradient
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={styles.gradient}
           >
             <View style={styles.header}>
-              <View style={styles.chainSelector}>
-                <Button
-                  mode="outlined"
-                  onPress={() => setShowChainSelector(true)}
-                  icon="chevron-down"
-                  textColor="white"
-                  style={styles.chainButton}
-                >
-                  {currentChain?.name || "Unknown Chain"}
-                </Button>
-              </View>
               <IconButton
                 icon="qrcode"
                 iconColor="white"
+                size={24}
                 onPress={() => setShowQR(true)}
+                style={styles.qrButton}
               />
             </View>
 
@@ -248,7 +276,7 @@ const WalletScreen = ({ navigation }) => {
                             style={styles.tokenLogo}
                           />
                         ) : (
-                          <List.Icon {...props} icon="coin" />
+                          <List.Icon {...props} icon="currency-usd" />
                         )
                       }
                       right={() => (
@@ -270,22 +298,6 @@ const WalletScreen = ({ navigation }) => {
               </>
             )}
           </Card.Content>
-        </Card>
-
-        {/* NFTs Section */}
-        <Card style={styles.nftCard}>
-          <Card.Title
-            title="NFTs"
-            right={(props) => (
-              <Button
-                {...props}
-                mode="text"
-                onPress={() => navigation.navigate("NFTCollection")}
-              >
-                View All
-              </Button>
-            )}
-          />
         </Card>
       </ScrollView>
 
@@ -416,6 +428,24 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  networkContainer: {
+    margin: 16,
+    marginBottom: 8,
+  },
+  networkLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: theme.colors.text,
+    marginBottom: 8,
+  },
+  networkButton: {
+    borderColor: theme.colors.primary,
+    borderWidth: 1,
+  },
+  networkButtonLabel: {
+    color: theme.colors.primary,
+    fontSize: 16,
+  },
   headerCard: {
     margin: 16,
     elevation: 8,
@@ -423,38 +453,47 @@ const styles = StyleSheet.create({
   gradient: {
     padding: 20,
     borderRadius: 12,
+    position: "relative",
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  chainSelector: {
-    flex: 1,
-  },
-  chainButton: {
-    borderColor: "rgba(255,255,255,0.3)",
+    position: "absolute",
+    top: 20,
+    right: 20,
+    zIndex: 1,
   },
   balanceSection: {
     alignItems: "center",
+    paddingTop: 10,
+  },
+  qrButton: {
+    backgroundColor: "rgba(255,255,255,0.15)",
   },
   balanceLabel: {
-    color: "rgba(255,255,255,0.8)",
+    color: "rgba(255,255,255,0.9)",
     fontSize: 16,
     marginBottom: 8,
+    fontWeight: "500",
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   balanceAmount: {
     color: "white",
     fontSize: 32,
     fontWeight: "bold",
     marginBottom: 8,
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   addressText: {
-    color: "rgba(255,255,255,0.6)",
+    color: "rgba(255,255,255,0.8)",
     fontSize: 14,
     fontFamily: "monospace",
     maxWidth: width * 0.7,
+    textShadowColor: "rgba(0,0,0,0.2)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
   },
   actionsContainer: {
     flexDirection: "row",
@@ -473,9 +512,6 @@ const styles = StyleSheet.create({
   tokenCard: {
     margin: 16,
     marginTop: 0,
-  },
-  nftCard: {
-    margin: 16,
   },
   loading: {
     marginVertical: 20,

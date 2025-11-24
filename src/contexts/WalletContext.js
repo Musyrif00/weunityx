@@ -15,10 +15,9 @@ const STORAGE_KEYS = {
 export const WalletProvider = ({ children }) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
-  const [selectedChain, setSelectedChain] = useState("0x1"); // Default to Ethereum
+  const [selectedChain, setSelectedChain] = useState("0x38"); // Default to BSC
   const [balances, setBalances] = useState(null);
   const [transactions, setTransactions] = useState([]);
-  const [nfts, setNfts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -101,7 +100,6 @@ export const WalletProvider = ({ children }) => {
       setWalletAddress(null);
       setBalances(null);
       setTransactions([]);
-      setNfts([]);
       setError(null);
 
       return true;
@@ -150,16 +148,13 @@ export const WalletProvider = ({ children }) => {
       setRefreshing(true);
       setError(null);
 
-      const [walletBalances, walletTransactions, walletNFTs] =
-        await Promise.all([
-          walletService.getWalletBalances(address, chain),
-          walletService.getTransactions(address, chain, 20).catch(() => []),
-          walletService.getNFTs(address, chain, 20).catch(() => []),
-        ]);
+      const [walletBalances, walletTransactions] = await Promise.all([
+        walletService.getWalletBalances(address, chain),
+        walletService.getTransactions(address, chain, 20).catch(() => []),
+      ]);
 
       setBalances(walletBalances);
       setTransactions(walletTransactions);
-      setNfts(walletNFTs);
 
       // Cache balances
       await AsyncStorage.setItem(
@@ -244,7 +239,6 @@ export const WalletProvider = ({ children }) => {
     selectedChain,
     balances,
     transactions,
-    nfts,
     isLoading,
     error,
     refreshing,

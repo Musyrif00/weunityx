@@ -6,45 +6,14 @@ const MORALIS_CONFIG = {
   apiKey:
     process.env.EXPO_PUBLIC_MORALIS_API_KEY || "YOUR_MORALIS_API_KEY_HERE",
 
-  // Supported chains - you can add more as needed
+  // Supported chains - Currently only BSC
   supportedChains: [
-    {
-      name: "Ethereum",
-      chainId: "0x1",
-      symbol: "ETH",
-      rpcUrl: "https://mainnet.infura.io/v3/YOUR_INFURA_KEY",
-      explorerUrl: "https://etherscan.io",
-    },
-    {
-      name: "Polygon",
-      chainId: "0x89",
-      symbol: "MATIC",
-      rpcUrl: "https://polygon-rpc.com",
-      explorerUrl: "https://polygonscan.com",
-    },
     {
       name: "BSC",
       chainId: "0x38",
       symbol: "BNB",
       rpcUrl: "https://bsc-dataseed1.binance.org",
       explorerUrl: "https://bscscan.com",
-    },
-    // Testnets for development
-    {
-      name: "Sepolia",
-      chainId: "0xaa36a7",
-      symbol: "ETH",
-      rpcUrl: "https://sepolia.infura.io/v3/YOUR_INFURA_KEY",
-      explorerUrl: "https://sepolia.etherscan.io",
-      testnet: true,
-    },
-    {
-      name: "Mumbai",
-      chainId: "0x13881",
-      symbol: "MATIC",
-      rpcUrl: "https://matic-mumbai.chainstacklabs.com",
-      explorerUrl: "https://mumbai.polygonscan.com",
-      testnet: true,
     },
   ],
 };

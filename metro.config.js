@@ -9,12 +9,12 @@ config.resolver.blockList = [
   /functions\\.*/,
   /.*\/functions\/.*/,
   /.*\\functions\\.*/,
-  // Specific lib directory exclusions
-  /.*\/lib\/.*/,
-  /.*\\lib\\.*/,
-  // Direct lib index references
-  /lib\/index/,
-  /lib\\index/,
+  // Exclude only the local lib directory (not node_modules lib directories)
+  /^lib\/.*/,
+  /^lib\\.*/,
+  // Direct lib index references in root
+  /^lib\/index/,
+  /^lib\\index/,
 ];
 
 module.exports = config;
