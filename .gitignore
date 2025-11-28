@@ -85,3 +85,9 @@ yarn-error.*
 .firebase/
 firebase-debug.log
 firestore-debug.log
+google-services.json
+
+# Config files with credentials
+src/config/agora.js
+src/config/firebase.js
+src/config/moralis.js
