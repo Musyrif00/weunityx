@@ -1571,3 +1571,63 @@ export const storageService = {
     }
   },
 };
+
+// CALL SERVICE
+export const callService = {
+  // Send call notification to user
+  sendCallNotification: async (
+    callerId,
+    receiverId,
+    channelName,
+    callType = "voice"
+  ) => {
+    try {
+      const callerDoc = await getDoc(doc(db, COLLECTIONS.USERS, callerId));
+      const callerData = callerDoc.data();
+
+      // Create notification data
+      const notificationData = {
+        userId: receiverId,
+        fromUserId: callerId,
+        type: callType === "voice" ? "call_voice" : "call_video",
+        message: `${callerData?.fullName || "Someone"} is calling you`,
+        data: {
+          channelName,
+          callerId,
+          callerName: callerData?.fullName,
+          callerAvatar: callerData?.avatar,
+          callType,
+        },
+      };
+
+      // Create push notification data
+      const pushData = {
+        title:
+          callType === "voice"
+            ? "📞 Incoming Voice Call"
+            : "📹 Incoming Video Call",
+        body: `${callerData?.fullName || "Someone"} is calling you`,
+        data: {
+          type: callType === "voice" ? "call_voice" : "call_video",
+          channelName,
+          callerId,
+          callerName: callerData?.fullName,
+          callerAvatar: callerData?.avatar,
+          callType,
+          categoryId: "calls",
+        },
+      };
+
+      // Create notification with push
+      await notificationService.createNotificationWithPush(
+        notificationData,
+        pushData
+      );
+
+      return true;
+    } catch (error) {
+      console.error("Error sending call notification:", error);
+      throw error;
+    }
+  },
+};

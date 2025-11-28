@@ -1,66 +1,175 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { StatusBar } from "expo-status-bar";
 import { NavigationContainer } from "@react-navigation/native";
 import { Provider as PaperProvider } from "react-native-paper";
-import { AuthProvider } from "./src/contexts/AuthContext";
+import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
 import { ThemeProvider, lightTheme } from "./src/contexts/ThemeContext";
 import { WalletProvider } from "./src/contexts/WalletContext";
 import AppNavigator from "./src/navigation/AppNavigator";
 import PushNotificationService from "./src/services/pushNotifications";
+import IncomingCallModal from "./src/components/IncomingCallModal";
+import { notificationService } from "./src/services/firebase";
+
+// Initialize Firebase before anything else
+import "./src/config/firebase";
 
 // Polyfill for TextEncoder/TextDecoder (required for QR code generation)
 import "fast-text-encoding";
 
-const AppContent = () => {
-  // Always use light theme (disabled dynamic theming)
+const NavigationWrapper = () => {
+  const { user } = useAuth();
+  const navigationRef = useRef(null);
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [showIncomingCall, setShowIncomingCall] = useState(false);
 
   useEffect(() => {
     // Set up notification listeners
-    const notificationListener =
-      PushNotificationService.addNotificationReceivedListener(
-        (notification) => {
-          console.log("Notification received:", notification);
-        }
-      );
+    try {
+      const notificationListener =
+        PushNotificationService.addNotificationReceivedListener(
+          (notification) => {
+            // Check if it's a call notification
+            const { data } = notification.request.content;
+            if (data?.type === "call_voice" || data?.type === "call_video") {
+              setIncomingCall({
+                caller: {
+                  id: data.callerId,
+                  fullName: data.callerName,
+                  avatar: data.callerAvatar,
+                },
+                callType: data.callType,
+                channelName: data.channelName,
+              });
+              setShowIncomingCall(true);
+            }
+          }
+        );
 
-    const responseListener =
-      PushNotificationService.addNotificationResponseReceivedListener(
-        (response) => {
-          console.log("Notification response:", response);
-          // Handle notification tap
-          const { data } = response.notification.request.content;
+      const responseListener =
+        PushNotificationService.addNotificationResponseReceivedListener(
+          (response) => {
+            const { data } = response.notification.request.content;
 
-          // You can navigate to specific screens based on notification data
-          // Example: if (data.screen) navigation.navigate(data.screen, data.params);
-        }
-      );
+            // Handle call notification tap
+            if (data?.type === "call_voice" || data?.type === "call_video") {
+              handleAcceptCall();
+            }
+          }
+        );
 
-    return () => {
-      PushNotificationService.removeNotificationSubscription(
-        notificationListener
-      );
-      PushNotificationService.removeNotificationSubscription(responseListener);
-    };
+      return () => {
+        PushNotificationService.removeNotificationSubscription(
+          notificationListener
+        );
+        PushNotificationService.removeNotificationSubscription(
+          responseListener
+        );
+      };
+    } catch (error) {
+      console.error("Error setting up push notifications:", error);
+    }
   }, []);
 
+  // Listen for call notifications in Firestore
+  useEffect(() => {
+    if (!user?.uid) {
+      return;
+    }
+
+    let unsubscribe;
+    try {
+      unsubscribe = notificationService.subscribeToNotifications(
+        user.uid,
+        (notifications) => {
+          // Check for new call notifications
+          const callNotification = notifications.find(
+            (n) =>
+              !n.read &&
+              (n.type === "call_voice" || n.type === "call_video") &&
+              n.data?.channelName
+          );
+
+          if (callNotification) {
+            setIncomingCall({
+              caller: {
+                id: callNotification.data.callerId,
+                fullName: callNotification.data.callerName,
+                avatar: callNotification.data.callerAvatar,
+              },
+              callType: callNotification.data.callType,
+              channelName: callNotification.data.channelName,
+              notificationId: callNotification.id,
+            });
+            setShowIncomingCall(true);
+          }
+        }
+      );
+    } catch (error) {
+      console.error("Error subscribing to call notifications:", error);
+    }
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [user]);
+
+  const handleAcceptCall = () => {
+    if (!incomingCall) return;
+
+    // Mark notification as read
+    if (incomingCall.notificationId) {
+      notificationService.markNotificationAsRead(incomingCall.notificationId);
+    }
+
+    // Navigate to call screen
+    const screenName =
+      incomingCall.callType === "voice" ? "VoiceCall" : "VideoCall";
+    navigationRef.current?.navigate(screenName, {
+      channelName: incomingCall.channelName,
+      otherUser: incomingCall.caller,
+    });
+
+    setShowIncomingCall(false);
+    setIncomingCall(null);
+  };
+
+  const handleDeclineCall = () => {
+    // Mark notification as read
+    if (incomingCall?.notificationId) {
+      notificationService.markNotificationAsRead(incomingCall.notificationId);
+    }
+
+    setShowIncomingCall(false);
+    setIncomingCall(null);
+  };
+
   return (
-    <PaperProvider theme={lightTheme}>
-      <AuthProvider>
-        <WalletProvider>
-          <NavigationContainer>
-            <StatusBar style="dark" />
-            <AppNavigator />
-          </NavigationContainer>
-        </WalletProvider>
-      </AuthProvider>
-    </PaperProvider>
+    <NavigationContainer ref={navigationRef}>
+      <StatusBar style="dark" />
+      <AppNavigator />
+
+      {/* Incoming Call Modal */}
+      <IncomingCallModal
+        visible={showIncomingCall}
+        caller={incomingCall?.caller}
+        callType={incomingCall?.callType}
+        onAccept={handleAcceptCall}
+        onDecline={handleDeclineCall}
+      />
+    </NavigationContainer>
   );
 };
 
 export default function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <PaperProvider theme={lightTheme}>
+        <AuthProvider>
+          <WalletProvider>
+            <NavigationWrapper />
+          </WalletProvider>
+        </AuthProvider>
+      </PaperProvider>
     </ThemeProvider>
   );
 }

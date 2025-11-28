@@ -35,6 +35,8 @@ import EditProfileScreen from "../screens/Profile/Edit";
 import SettingsScreen from "../screens/Profile/Settings";
 import SavedPostsScreen from "../screens/SavedPosts";
 import BlockedUsersScreen from "../screens/BlockedUsers";
+import VideoCallScreen from "../screens/VideoCall";
+import VoiceCallScreen from "../screens/VoiceCall";
 
 import { useAuth } from "../contexts/AuthContext";
 
@@ -173,6 +175,16 @@ const AppNavigator = () => {
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
           <Stack.Screen name="SavedPosts" component={SavedPostsScreen} />
           <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
+          <Stack.Screen
+            name="VideoCall"
+            component={VideoCallScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="VoiceCall"
+            component={VoiceCallScreen}
+            options={{ headerShown: false }}
+          />
           <Stack.Screen
             name="TransactionHistory"
             component={TransactionHistory}

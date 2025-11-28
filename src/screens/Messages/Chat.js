@@ -16,7 +16,7 @@ import {
 } from "react-native-paper";
 import { theme as staticTheme, spacing } from "../../constants";
 import { useAuth } from "../../contexts/AuthContext";
-import { chatService } from "../../services/firebase";
+import { chatService, callService } from "../../services/firebase";
 
 const MessageBubble = ({ message, isOwn, senderData }) => {
   const formatTime = (date) => {
@@ -206,8 +206,58 @@ const ChatScreen = ({ route, navigation }) => {
           </View>
         </View>
         <View style={styles.headerActions}>
-          <IconButton icon="phone" />
-          <IconButton icon="video" />
+          <IconButton
+            icon="phone"
+            onPress={async () => {
+              // Sort user IDs to ensure same channel name regardless of who initiates
+              const sortedIds = [user.uid, otherParticipantData?.id].sort();
+              const channelName =
+                currentChat?.id || `call_${sortedIds[0]}_${sortedIds[1]}`;
+
+              // Send call notification to other user
+              try {
+                await callService.sendCallNotification(
+                  user.uid,
+                  otherParticipantData?.id,
+                  channelName,
+                  "voice"
+                );
+              } catch (error) {
+                console.error("Error sending call notification:", error);
+              }
+
+              navigation.navigate("VoiceCall", {
+                channelName,
+                otherUser: otherParticipantData,
+              });
+            }}
+          />
+          <IconButton
+            icon="video"
+            onPress={async () => {
+              // Sort user IDs to ensure same channel name regardless of who initiates
+              const sortedIds = [user.uid, otherParticipantData?.id].sort();
+              const channelName =
+                currentChat?.id || `call_${sortedIds[0]}_${sortedIds[1]}`;
+
+              // Send call notification to other user
+              try {
+                await callService.sendCallNotification(
+                  user.uid,
+                  otherParticipantData?.id,
+                  channelName,
+                  "video"
+                );
+              } catch (error) {
+                console.error("Error sending call notification:", error);
+              }
+
+              navigation.navigate("VideoCall", {
+                channelName,
+                otherUser: otherParticipantData,
+              });
+            }}
+          />
         </View>
       </View>
 

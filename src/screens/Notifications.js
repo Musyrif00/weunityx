@@ -30,6 +30,10 @@ const NotificationItem = ({ notification, onPress, users }) => {
         return "calendar";
       case "story":
         return "camera";
+      case "call_voice":
+        return "phone";
+      case "call_video":
+        return "video";
       default:
         return "bell";
     }
@@ -47,6 +51,9 @@ const NotificationItem = ({ notification, onPress, users }) => {
         return "#FF9800";
       case "story":
         return "#9C27B0";
+      case "call_voice":
+      case "call_video":
+        return "#00BCD4";
       default:
         return staticTheme.colors.textSecondary;
     }
@@ -228,6 +235,30 @@ const NotificationsScreen = ({ navigation }) => {
           if (notification.eventId) {
             navigation.navigate("EventDetail", {
               event: { id: notification.eventId },
+            });
+          }
+          break;
+        case "call_voice":
+          if (notification.data?.channelName) {
+            navigation.navigate("VoiceCall", {
+              channelName: notification.data.channelName,
+              otherUser: {
+                id: notification.data.callerId,
+                fullName: notification.data.callerName,
+                avatar: notification.data.callerAvatar,
+              },
+            });
+          }
+          break;
+        case "call_video":
+          if (notification.data?.channelName) {
+            navigation.navigate("VideoCall", {
+              channelName: notification.data.channelName,
+              otherUser: {
+                id: notification.data.callerId,
+                fullName: notification.data.callerName,
+                avatar: notification.data.callerAvatar,
+              },
             });
           }
           break;
