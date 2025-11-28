@@ -32,12 +32,15 @@ const ProfileScreen = ({ navigation }) => {
       const profile = await userService.getUser(user.uid);
 
       // Ensure profile has default values
+      const followers = profile?.followers || [];
+      const following = profile?.following || [];
+
       const safeProfile = {
         ...profile,
-        followers: profile?.followers || [],
-        following: profile?.following || [],
-        followersCount: profile?.followersCount || 0,
-        followingCount: profile?.followingCount || 0,
+        followers,
+        following,
+        followersCount: profile?.followersCount ?? followers.length,
+        followingCount: profile?.followingCount ?? following.length,
         bio: profile?.bio || "Welcome to my WeUnityX profile! 🚀",
         fullName: profile?.fullName || user?.displayName || "User",
         avatar: profile?.avatar || user?.photoURL,
@@ -163,14 +166,6 @@ const ProfileScreen = ({ navigation }) => {
             icon="chevron-right"
             onPress={() => navigation.navigate("SavedPosts")}
           />
-        </View>
-
-        <Divider />
-
-        <View style={styles.menuItem}>
-          <IconButton icon="calendar" />
-          <Text style={styles.menuText}>My Events</Text>
-          <IconButton icon="chevron-right" />
         </View>
 
         <Divider />

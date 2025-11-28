@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, FlatList, Image } from "react-native";
+import { View, StyleSheet, FlatList, Image, ScrollView } from "react-native";
 import {
   Text,
   IconButton,
   Avatar,
   Badge,
   ActivityIndicator,
+  Chip,
 } from "react-native-paper";
 import { Card } from "../../components";
 import { HeaderLogo } from "../../components/Logo";
 import { theme as staticTheme, spacing } from "../../constants";
 import { useAuth } from "../../contexts/AuthContext";
-import { chatService } from "../../services/firebase";
+import { chatService, userService } from "../../services/firebase";
 
 const ChatItem = ({ chat, currentUserId, onPress }) => {
   // Get the other participant's data
@@ -91,10 +92,12 @@ const MessagesListScreen = ({ navigation }) => {
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [followingSuggestions, setFollowingSuggestions] = useState([]);
 
   useEffect(() => {
     if (user?.uid) {
       loadChats();
+      loadFollowingSuggestions();
     }
   }, [user?.uid]);
 
@@ -112,10 +115,45 @@ const MessagesListScreen = ({ navigation }) => {
     }
   };
 
+  const loadFollowingSuggestions = async () => {
+    if (!user?.uid) return;
+
+    try {
+      // Get user profile to access following list
+      const profile = await userService.getUser(user.uid);
+      const following = profile?.following || [];
+
+      if (following.length === 0) return;
+
+      // Get user data for people you're following
+      const suggestions = await Promise.all(
+        following.slice(0, 10).map(async (userId) => {
+          const userData = await userService.getUser(userId);
+          return userData ? { id: userId, ...userData } : null;
+        })
+      );
+
+      setFollowingSuggestions(suggestions.filter(Boolean));
+    } catch (error) {
+      console.error("Error loading following suggestions:", error);
+    }
+  };
+
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadChats();
+    await Promise.all([loadChats(), loadFollowingSuggestions()]);
     setRefreshing(false);
+  };
+
+  const handleStartChat = (suggestedUser) => {
+    navigation.navigate("Chat", {
+      otherUser: {
+        id: suggestedUser.id,
+        fullName: suggestedUser.fullName,
+        avatar: suggestedUser.avatar,
+        username: suggestedUser.username,
+      },
+    });
   };
 
   const handleChatPress = (chat) => {
@@ -204,6 +242,56 @@ const MessagesListScreen = ({ navigation }) => {
         refreshing={refreshing}
         onRefresh={handleRefresh}
         ListEmptyComponent={<EmptyState />}
+        ListHeaderComponent={
+          followingSuggestions.length > 0 && chats.length > 0 ? (
+            <View style={styles.suggestionsContainer}>
+              <Text style={styles.suggestionsTitle}>Start a conversation</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.suggestionsScroll}
+              >
+                {followingSuggestions.map((person) => {
+                  const avatarUri =
+                    person.avatar ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                      person.fullName || "User"
+                    )}&background=702963&color=fff`;
+
+                  return (
+                    <Card
+                      key={person.id}
+                      style={styles.suggestionCard}
+                      onPress={() => handleStartChat(person)}
+                    >
+                      {person.avatar ? (
+                        <Avatar.Image
+                          source={{ uri: person.avatar }}
+                          size={60}
+                        />
+                      ) : (
+                        <Avatar.Text
+                          label={
+                            person.fullName?.substring(0, 2).toUpperCase() ||
+                            "U"
+                          }
+                          size={60}
+                          color="#fff"
+                          style={{
+                            backgroundColor: staticTheme.colors.primary,
+                          }}
+                        />
+                      )}
+                      <Text style={styles.suggestionName} numberOfLines={1}>
+                        {person.fullName}
+                      </Text>
+                    </Card>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          ) : null
+        }
       />
     </View>
   );
@@ -314,6 +402,34 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 24,
     paddingHorizontal: spacing.lg,
+  },
+  suggestionsContainer: {
+    marginBottom: spacing.lg,
+  },
+  suggestionsTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: staticTheme.colors.text,
+    marginBottom: spacing.md,
+  },
+  suggestionsScroll: {
+    marginHorizontal: -spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  suggestionCard: {
+    width: 90,
+    height: 110,
+    marginRight: spacing.sm,
+    padding: spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  suggestionName: {
+    fontSize: 12,
+    color: staticTheme.colors.text,
+    marginTop: spacing.sm,
+    textAlign: "center",
+    width: "100%",
   },
 });
 

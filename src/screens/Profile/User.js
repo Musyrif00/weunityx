@@ -51,12 +51,15 @@ const UserProfileScreen = ({ route, navigation }) => {
       }
 
       // Ensure profile has default values for arrays and counts
+      const followers = profile.followers || [];
+      const following = profile.following || [];
+
       const safeProfile = {
         ...profile,
-        followers: profile.followers || [],
-        following: profile.following || [],
-        followersCount: profile.followersCount || 0,
-        followingCount: profile.followingCount || 0,
+        followers,
+        following,
+        followersCount: profile.followersCount ?? followers.length,
+        followingCount: profile.followingCount ?? following.length,
       };
 
       setUserProfile(safeProfile);

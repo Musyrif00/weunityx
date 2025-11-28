@@ -66,12 +66,13 @@ const MessageBubble = ({ message, isOwn, senderData }) => {
 };
 
 const ChatScreen = ({ route, navigation }) => {
-  const { chat } = route.params || {};
+  const { chat, otherUser } = route.params || {};
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [currentChat, setCurrentChat] = useState(null);
   const flatListRef = useRef(null);
 
   // Deserialize chat dates if they are strings (from navigation serialization)
@@ -88,18 +89,39 @@ const ChatScreen = ({ route, navigation }) => {
   const deserializedChat = deserializeChat(chat);
 
   // Get the other participant's data
-  const otherParticipant = deserializedChat?.participants?.find(
-    (id) => id !== user.uid
-  );
+  const otherParticipant =
+    currentChat?.participants?.find((id) => id !== user.uid) || otherUser?.id;
   const otherParticipantData =
-    deserializedChat?.participantsData?.[otherParticipant];
+    currentChat?.participantsData?.[otherParticipant] || otherUser;
 
   useEffect(() => {
-    if (!deserializedChat?.id) return;
+    const initializeChat = async () => {
+      if (deserializedChat?.id) {
+        setCurrentChat(deserializedChat);
+      } else if (otherUser?.id) {
+        // Get or create chat with the other user
+        try {
+          const existingChat = await chatService.getOrCreateChat(
+            user.uid,
+            otherUser.id
+          );
+          setCurrentChat(existingChat);
+        } catch (error) {
+          console.error("Error getting/creating chat:", error);
+          setLoading(false);
+        }
+      }
+    };
+
+    initializeChat();
+  }, [deserializedChat?.id, otherUser?.id, user.uid]);
+
+  useEffect(() => {
+    if (!currentChat?.id) return;
 
     // Subscribe to messages
     const unsubscribe = chatService.subscribeToMessages(
-      deserializedChat.id,
+      currentChat.id,
       (messagesData) => {
         setMessages(messagesData);
         setLoading(false);
@@ -112,11 +134,11 @@ const ChatScreen = ({ route, navigation }) => {
 
     // Mark messages as read when entering chat
     chatService
-      .markMessagesAsRead(deserializedChat.id, user.uid)
+      .markMessagesAsRead(currentChat.id, user.uid)
       .catch(console.error);
 
     return () => unsubscribe?.();
-  }, [deserializedChat?.id, user.uid]);
+  }, [currentChat?.id, user.uid]);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || sending) return;
@@ -127,7 +149,7 @@ const ChatScreen = ({ route, navigation }) => {
 
     try {
       await chatService.sendMessage(
-        deserializedChat.id,
+        currentChat.id,
         user.uid,
         otherParticipant,
         messageText

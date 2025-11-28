@@ -987,6 +987,36 @@ export const chatService = {
       throw error;
     }
   },
+
+  // Get or create chat (wrapper for createOrGetChat)
+  getOrCreateChat: async (userId1, userId2) => {
+    try {
+      const chatId = getChatId(userId1, userId2);
+      const chatRef = doc(db, COLLECTIONS.CHATS, chatId);
+      const chatDoc = await getDoc(chatRef);
+
+      if (chatDoc.exists()) {
+        return { id: chatDoc.id, ...chatDoc.data() };
+      }
+
+      // Get user data for both users
+      const [user1Data, user2Data] = await Promise.all([
+        userService.getUser(userId1),
+        userService.getUser(userId2),
+      ]);
+
+      // Create new chat
+      return await chatService.createOrGetChat(
+        userId1,
+        userId2,
+        user1Data,
+        user2Data
+      );
+    } catch (error) {
+      console.error("Error getting/creating chat:", error);
+      throw error;
+    }
+  },
 };
 
 // NOTIFICATION SERVICES
