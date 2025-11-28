@@ -41,6 +41,7 @@ const WalletScreen = ({ navigation }) => {
     refreshWalletData,
     changeChain,
     clearError,
+    removeWallet,
   } = useWallet();
 
   const [showAddWallet, setShowAddWallet] = useState(false);
@@ -106,6 +107,27 @@ const WalletScreen = ({ navigation }) => {
     }
   };
 
+  // Disconnect wallet
+  const handleDisconnectWallet = () => {
+    Alert.alert(
+      "Disconnect Wallet",
+      "Are you sure you want to disconnect your wallet?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Disconnect",
+          style: "destructive",
+          onPress: async () => {
+            await removeWallet();
+          },
+        },
+      ]
+    );
+  };
+
   // Show error alert
   useEffect(() => {
     if (error) {
@@ -115,10 +137,31 @@ const WalletScreen = ({ navigation }) => {
 
   if (!hasWallet) {
     return (
-      <AddWalletModal
-        visible={showAddWallet}
-        onDismiss={() => setShowAddWallet(false)}
-      />
+      <View style={styles.container}>
+        <View style={styles.emptyStateContainer}>
+          <IconButton
+            icon="wallet"
+            size={80}
+            iconColor={theme.colors.primary}
+          />
+          <Text style={styles.emptyStateTitle}>No Wallet Connected</Text>
+          <Text style={styles.emptyStateDescription}>
+            Connect your crypto wallet to view your balances, tokens, and
+            transaction history
+          </Text>
+          <Button
+            mode="contained"
+            onPress={() => setShowAddWallet(true)}
+            style={styles.connectWalletButton}
+          >
+            Connect Wallet
+          </Button>
+        </View>
+        <AddWalletModal
+          visible={showAddWallet}
+          onDismiss={() => setShowAddWallet(false)}
+        />
+      </View>
     );
   }
 
@@ -150,24 +193,14 @@ const WalletScreen = ({ navigation }) => {
         <Card style={styles.headerCard}>
           <LinearGradient
             colors={[
-              "#4c1d95", // More vibrant purple
-              "#7c3aed", // Lighter purple for better contrast
-              "#8b5cf6", // Even lighter for nice gradient
+              "#702963", // App primary color
+              "#8b3a7a", // Lighter shade
+              "#a54d91", // Even lighter for nice gradient
             ]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.gradient}
           >
-            <View style={styles.header}>
-              <IconButton
-                icon="qrcode"
-                iconColor="white"
-                size={24}
-                onPress={() => setShowQR(true)}
-                style={styles.qrButton}
-              />
-            </View>
-
             <View style={styles.balanceSection}>
               <Text style={styles.balanceLabel}>Total Balance</Text>
               <Text style={styles.balanceAmount}>
@@ -180,11 +213,38 @@ const WalletScreen = ({ navigation }) => {
               <Button
                 mode="text"
                 onPress={copyAddress}
-                textColor="rgba(255,255,255,0.8)"
                 compact
+                labelStyle={styles.copyAddressLabel}
+                contentStyle={styles.copyAddressContent}
               >
                 Tap to copy address
               </Button>
+
+              <View style={styles.walletActions}>
+                <Button
+                  mode="outlined"
+                  icon="qrcode"
+                  onPress={() => setShowQR(true)}
+                  textColor="white"
+                  style={styles.walletActionButton}
+                  labelStyle={styles.walletActionLabel}
+                >
+                  QR Code
+                </Button>
+                <Button
+                  mode="outlined"
+                  icon="logout"
+                  onPress={handleDisconnectWallet}
+                  textColor="white"
+                  style={[
+                    styles.walletActionButton,
+                    styles.disconnectActionButton,
+                  ]}
+                  labelStyle={styles.walletActionLabel}
+                >
+                  Disconnect
+                </Button>
+              </View>
             </View>
           </LinearGradient>
         </Card>
@@ -453,20 +513,34 @@ const styles = StyleSheet.create({
   gradient: {
     padding: 20,
     borderRadius: 12,
-    position: "relative",
-  },
-  header: {
-    position: "absolute",
-    top: 20,
-    right: 20,
-    zIndex: 1,
   },
   balanceSection: {
     alignItems: "center",
-    paddingTop: 10,
   },
-  qrButton: {
-    backgroundColor: "rgba(255,255,255,0.15)",
+  walletActions: {
+    flexDirection: "row",
+    marginTop: 20,
+    gap: 12,
+  },
+  walletActionButton: {
+    borderColor: "rgba(255,255,255,0.5)",
+    borderWidth: 1,
+    flex: 1,
+  },
+  disconnectActionButton: {
+    borderColor: "rgba(239, 68, 68, 0.6)",
+  },
+  walletActionLabel: {
+    color: "white",
+    fontSize: 13,
+  },
+  copyAddressLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#ffffff",
+  },
+  copyAddressContent: {
+    opacity: 1,
   },
   balanceLabel: {
     color: "rgba(255,255,255,0.9)",
@@ -602,6 +676,30 @@ const styles = StyleSheet.create({
   modalButton: {
     flex: 1,
     marginHorizontal: 5,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+  },
+  emptyStateTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: theme.colors.text,
+    marginTop: 16,
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  emptyStateDescription: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+    marginBottom: 32,
+    lineHeight: 24,
+  },
+  connectWalletButton: {
+    paddingHorizontal: 32,
   },
 });
 

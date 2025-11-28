@@ -4,10 +4,10 @@
     "slug": "weunityx",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logowithname.jpg",
+    "icon": "./assets/logolauncher.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/logosplash.jpg",
+      "image": "./assets/logolauncher.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -17,7 +17,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logowithname.jpg",
+        "foregroundImage": "./assets/logolauncher.png",
         "backgroundColor": "#FFFFFF"
       },
       "permissions": [
@@ -25,11 +25,17 @@
         "RECORD_AUDIO",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
-      ]
+      ],
+      "package": "com.weunityx.test"
     },
     "web": {
       "bundler": "metro",
       "favicon": "./assets/logowithname.jpg"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "84a2f5ca-ac46-4051-84cb-95a2a84be7ee"
+      }
     }
   }
 }

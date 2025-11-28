@@ -8,6 +8,9 @@ import { WalletProvider } from "./src/contexts/WalletContext";
 import AppNavigator from "./src/navigation/AppNavigator";
 import PushNotificationService from "./src/services/pushNotifications";
 
+// Polyfill for TextEncoder/TextDecoder (required for QR code generation)
+import "fast-text-encoding";
+
 const AppContent = () => {
   // Always use light theme (disabled dynamic theming)
 

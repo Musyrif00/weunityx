@@ -43,6 +43,13 @@ const UserProfileScreen = ({ route, navigation }) => {
       // Load user profile
       const profile = await userService.getUser(targetUser.id);
 
+      // Check if profile exists (user might be deleted)
+      if (!profile) {
+        setUserProfile(null);
+        setLoading(false);
+        return;
+      }
+
       // Ensure profile has default values for arrays and counts
       const safeProfile = {
         ...profile,
@@ -55,7 +62,7 @@ const UserProfileScreen = ({ route, navigation }) => {
       setUserProfile(safeProfile);
 
       // Check if current user is following this user
-      if (safeProfile && !isOwnProfile) {
+      if (!isOwnProfile) {
         setIsFollowing(
           safeProfile.followers.includes(currentUser.uid) || false
         );
@@ -66,7 +73,7 @@ const UserProfileScreen = ({ route, navigation }) => {
       setUserPosts(posts);
     } catch (error) {
       console.error("Error loading user data:", error);
-      Alert.alert("Error", "Failed to load user profile");
+      setUserProfile(null);
     } finally {
       setLoading(false);
     }

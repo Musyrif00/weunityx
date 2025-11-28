@@ -7,7 +7,6 @@ import { useTheme } from "../contexts/ThemeContext";
 
 // Import screens
 import HomeScreen from "../screens/Home";
-import EventsScreen from "../screens/Events";
 import MessagesScreen from "../screens/Messages/List";
 import ProfileScreen from "../screens/Profile/MyProfile";
 import SearchScreen from "../screens/Search";
@@ -34,8 +33,6 @@ import CommentsScreen from "../screens/Comments";
 import UserProfileScreen from "../screens/Profile/User";
 import EditProfileScreen from "../screens/Profile/Edit";
 import SettingsScreen from "../screens/Profile/Settings";
-import EventDetailScreen from "../screens/Events/Detail";
-import AddEventScreen from "../screens/Events/Add";
 import SavedPostsScreen from "../screens/SavedPosts";
 import BlockedUsersScreen from "../screens/BlockedUsers";
 
@@ -88,15 +85,6 @@ const TabNavigator = () => {
         options={{
           tabBarIcon: ({ color, size }) => (
             <TabIcon name="magnify" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Events"
-        component={EventsScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <TabIcon name="calendar" color={color} size={size} />
           ),
         }}
       />
@@ -183,8 +171,6 @@ const AppNavigator = () => {
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
-          <Stack.Screen name="EventDetail" component={EventDetailScreen} />
-          <Stack.Screen name="AddEvent" component={AddEventScreen} />
           <Stack.Screen name="SavedPosts" component={SavedPostsScreen} />
           <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
           <Stack.Screen
