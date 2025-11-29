@@ -86,21 +86,34 @@ const NavigationWrapper = () => {
             (n) =>
               !n.read &&
               (n.type === "call_voice" || n.type === "call_video") &&
-              n.data?.channelName
+              n.data?.channelName &&
+              n.data?.callActive === true
           );
 
           if (callNotification) {
-            setIncomingCall({
-              caller: {
-                id: callNotification.data.callerId,
-                fullName: callNotification.data.callerName,
-                avatar: callNotification.data.callerAvatar,
-              },
-              callType: callNotification.data.callType,
-              channelName: callNotification.data.channelName,
-              notificationId: callNotification.id,
-            });
-            setShowIncomingCall(true);
+            // Check if call is not too old (max 60 seconds)
+            const callAge =
+              Date.now() - (callNotification.data.callStartTime || 0);
+            if (callAge < 60000) {
+              setIncomingCall({
+                caller: {
+                  id: callNotification.data.callerId,
+                  fullName: callNotification.data.callerName,
+                  avatar: callNotification.data.callerAvatar,
+                },
+                callType: callNotification.data.callType,
+                channelName: callNotification.data.channelName,
+                notificationId: callNotification.id,
+              });
+              setShowIncomingCall(true);
+            } else {
+              // Auto-dismiss old call notification
+              notificationService.markNotificationAsRead(callNotification.id);
+            }
+          } else if (showIncomingCall) {
+            // Call was canceled, hide the modal
+            setShowIncomingCall(false);
+            setIncomingCall(null);
           }
         }
       );
@@ -111,7 +124,7 @@ const NavigationWrapper = () => {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [user]);
+  }, [user, showIncomingCall]);
 
   const handleAcceptCall = () => {
     if (!incomingCall) return;

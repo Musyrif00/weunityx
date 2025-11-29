@@ -1,6 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import Moralis from "moralis";
+import { RtcTokenBuilder, RtcRole } from "agora-token";
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -455,3 +456,69 @@ export const searchTokens = functions.https.onCall(async (data, context) => {
     );
   }
 });
+
+// Generate Agora RTC Token
+export const generateAgoraToken = functions.https.onCall(
+  async (data, context) => {
+    try {
+      const { channelName, uid = 0, role = "publisher" } = data;
+
+      // Validate input
+      if (!channelName) {
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          "Channel name is required"
+        );
+      }
+
+      // Get Agora credentials from Firebase config
+      const appId = functions.config().agora?.app_id;
+      const appCertificate = functions.config().agora?.certificate;
+
+      if (!appId || !appCertificate) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          'Agora credentials not configured. Set them with: firebase functions:config:set agora.app_id="YOUR_APP_ID" agora.certificate="YOUR_CERTIFICATE"'
+        );
+      }
+
+      // Token expiration time (24 hours from now)
+      const expirationTimeInSeconds = 86400; // 24 hours
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+
+      // Determine role (1 = publisher, 2 = subscriber)
+      const userRole =
+        role === "audience" ? RtcRole.SUBSCRIBER : RtcRole.PUBLISHER;
+
+      // Generate token
+      const token = RtcTokenBuilder.buildTokenWithUid(
+        appId,
+        appCertificate,
+        channelName,
+        uid,
+        userRole,
+        privilegeExpiredTs,
+        privilegeExpiredTs
+      );
+
+      console.log(
+        `Generated Agora token for channel: ${channelName}, uid: ${uid}`
+      );
+
+      return {
+        token,
+        appId,
+        channelName,
+        uid,
+        expiresAt: privilegeExpiredTs,
+      };
+    } catch (error) {
+      console.error("generateAgoraToken error:", error);
+      throw new functions.https.HttpsError(
+        "internal",
+        `Failed to generate Agora token: ${error}`
+      );
+    }
+  }
+);

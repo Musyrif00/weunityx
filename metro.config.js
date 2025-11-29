@@ -17,4 +17,13 @@ config.resolver.blockList = [
   /^lib\\index/,
 ];
 
+// Custom resolver to handle react-native-svg/css
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === "react-native-svg/css") {
+    return context.resolveRequest(context, "react-native-svg", platform);
+  }
+  // Default behavior for other modules
+  return context.resolveRequest(context, moduleName, platform);
+};
+
 module.exports = config;

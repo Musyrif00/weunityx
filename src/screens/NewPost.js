@@ -18,7 +18,6 @@ import {
 } from "react-native-paper";
 import { Video } from "expo-av";
 import * as ImagePicker from "expo-image-picker";
-import * as Location from "expo-location";
 import { Button, Input, Card } from "../components";
 import { theme as staticTheme, spacing } from "../constants";
 import { useAuth } from "../contexts/AuthContext";
@@ -30,9 +29,7 @@ const NewPostScreen = ({ navigation }) => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [mediaType, setMediaType] = useState(null); // 'image' or 'video'
-  const [location, setLocation] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [loadingLocation, setLoadingLocation] = useState(false);
 
   const handleImagePicker = async () => {
     try {
@@ -141,48 +138,6 @@ const NewPostScreen = ({ navigation }) => {
     }
   };
 
-  const handleLocationPicker = async () => {
-    setLoadingLocation(true);
-    try {
-      // Request permission
-      const { status } = await Location.requestForegroundPermissionsAsync();
-
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission needed",
-          "Please grant permission to access location"
-        );
-        setLoadingLocation(false);
-        return;
-      }
-
-      // Get current location
-      const currentLocation = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = currentLocation.coords;
-
-      // Reverse geocoding to get address
-      const address = await Location.reverseGeocodeAsync({
-        latitude,
-        longitude,
-      });
-
-      if (address[0]) {
-        const locationString = `${address[0].name || ""} ${
-          address[0].city || ""
-        }, ${address[0].region || ""}`.trim();
-        setLocation({
-          address: locationString,
-          coordinates: { latitude, longitude },
-        });
-      }
-    } catch (error) {
-      console.error("Error getting location:", error);
-      Alert.alert("Error", "Failed to get location");
-    } finally {
-      setLoadingLocation(false);
-    }
-  };
-
   const handleCreatePost = async () => {
     if (!content.trim() && !selectedImage && !selectedVideo) {
       Alert.alert(
@@ -198,8 +153,6 @@ const NewPostScreen = ({ navigation }) => {
       const postData = {
         userId: user.uid,
         content: content.trim(),
-        location: location?.address || null,
-        coordinates: location?.coordinates || null,
       };
 
       // Convert media to blob if selected
@@ -243,10 +196,6 @@ const NewPostScreen = ({ navigation }) => {
     if (mediaType === "video") setMediaType(null);
   };
 
-  const removeLocation = () => {
-    setLocation(null);
-  };
-
   const showImageOptions = () => {
     Alert.alert("Add Image", "Choose an option", [
       { text: "Camera", onPress: handleCameraCapture },
@@ -262,7 +211,7 @@ const NewPostScreen = ({ navigation }) => {
     >
       <View style={styles.header}>
         <IconButton icon="close" onPress={() => navigation.goBack()} />
-        <Text style={styles.headerTitle}>Create Post</Text>
+        <Text style={styles.headerTitle}>Share Sense</Text>
         <PaperButton
           mode="contained"
           onPress={handleCreatePost}
@@ -321,18 +270,6 @@ const NewPostScreen = ({ navigation }) => {
             </View>
           )}
 
-          {location && (
-            <View style={styles.locationContainer}>
-              <Chip
-                icon="map-marker"
-                onClose={removeLocation}
-                style={styles.locationChip}
-              >
-                {location.address}
-              </Chip>
-            </View>
-          )}
-
           <View style={styles.actionsContainer}>
             <TouchableOpacity
               style={styles.actionButton}
@@ -351,25 +288,6 @@ const NewPostScreen = ({ navigation }) => {
             >
               <IconButton icon="video" iconColor={staticTheme.colors.primary} />
               <Text style={styles.actionText}>Video</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleLocationPicker}
-              disabled={loadingLocation}
-            >
-              {loadingLocation ? (
-                <ActivityIndicator
-                  size="small"
-                  color={staticTheme.colors.primary}
-                />
-              ) : (
-                <IconButton
-                  icon="map-marker"
-                  iconColor={staticTheme.colors.primary}
-                />
-              )}
-              <Text style={styles.actionText}>Location</Text>
             </TouchableOpacity>
           </View>
         </Card>
@@ -447,12 +365,6 @@ const styles = StyleSheet.create({
     right: spacing.sm,
     backgroundColor: "rgba(0,0,0,0.5)",
     borderRadius: 20,
-  },
-  locationContainer: {
-    marginBottom: spacing.md,
-  },
-  locationChip: {
-    alignSelf: "flex-start",
   },
   actionsContainer: {
     flexDirection: "row",

@@ -635,6 +635,10 @@ const HomeScreen = ({ navigation }) => {
         </View>
         <View style={styles.headerActions}>
           <IconButton
+            icon="video-wireless"
+            onPress={() => navigation.navigate("LiveStreamsList")}
+          />
+          <IconButton
             icon="plus"
             onPress={() => navigation.navigate("NewPost")}
           />

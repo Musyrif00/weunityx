@@ -13,17 +13,22 @@ import {
   ChannelProfileType,
   ClientRoleType,
 } from "react-native-agora";
-import { AGORA_APP_ID, AGORA_TOKEN } from "../config/agora";
+import { AGORA_APP_ID } from "../config/agora";
 import { theme } from "../constants/theme";
+import { generateAgoraToken } from "../services/agoraService";
+import { useAuth } from "../contexts/AuthContext";
+import { callService } from "../services/firebase";
 
 const VoiceCallScreen = ({ route, navigation }) => {
   const { channelName, otherUser } = route.params;
+  const { user } = useAuth();
   const agoraEngineRef = useRef(null);
   const [joined, setJoined] = useState(false);
   const [remoteUid, setRemoteUid] = useState(null);
   const [muted, setMuted] = useState(false);
   const [speakerEnabled, setSpeakerEnabled] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
+  const [agoraToken, setAgoraToken] = useState(null);
 
   useEffect(() => {
     initAgora();
@@ -82,6 +87,12 @@ const VoiceCallScreen = ({ route, navigation }) => {
         return;
       }
 
+      // Generate Agora token
+      console.log("Generating token for channel:", channelName);
+      const tokenData = await generateAgoraToken(channelName, 0, "publisher");
+      setAgoraToken(tokenData.token);
+      console.log("Token generated successfully");
+
       // Create RTC engine
       agoraEngineRef.current = createAgoraRtcEngine();
       const agoraEngine = agoraEngineRef.current;
@@ -116,7 +127,7 @@ const VoiceCallScreen = ({ route, navigation }) => {
       agoraEngine.setDefaultAudioRouteToSpeakerphone(false);
 
       // Join channel with token
-      agoraEngine.joinChannel(AGORA_TOKEN, channelName, 0, {
+      agoraEngine.joinChannel(tokenData.token, channelName, 0, {
         clientRoleType: ClientRoleType.ClientRoleBroadcaster,
       });
     } catch (error) {
@@ -125,12 +136,22 @@ const VoiceCallScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleEndCall = () => {
+  const handleEndCall = async () => {
     try {
       if (agoraEngineRef.current) {
         agoraEngineRef.current.leaveChannel();
         agoraEngineRef.current.release();
       }
+
+      // Cancel call notification for the other user
+      if (otherUser?.id && channelName) {
+        try {
+          await callService.cancelCallNotification(otherUser.id, channelName);
+        } catch (error) {
+          console.error("Error canceling call notification:", error);
+        }
+      }
+
       navigation.goBack();
     } catch (error) {
       navigation.goBack();

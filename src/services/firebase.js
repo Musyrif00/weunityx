@@ -38,6 +38,7 @@ export const COLLECTIONS = {
   SAVED_POSTS: "savedPosts",
   BLOCKED_USERS: "blockedUsers",
   REPORTS: "reports",
+  LIVE_STREAMS: "liveStreams",
 };
 
 // Helper function to generate chat ID
@@ -1207,12 +1208,12 @@ export const notificationService = {
 // SEARCH SERVICES
 export const searchService = {
   // Search users
-  searchUsers: async (query, limitCount = 20) => {
+  searchUsers: async (searchTerm, limitCount = 20) => {
     try {
-      if (!query || query.trim().length < 2) return [];
+      if (!searchTerm || searchTerm.trim().length < 2) return [];
 
       const usersRef = collection(db, COLLECTIONS.USERS);
-      const searchQuery = query.toLowerCase().trim();
+      const searchQuery = searchTerm.toLowerCase().trim();
 
       // Search by fullName (case-insensitive)
       const nameQuery = query(
@@ -1254,12 +1255,12 @@ export const searchService = {
   },
 
   // Search posts
-  searchPosts: async (query, limitCount = 20) => {
+  searchPosts: async (searchTerm, limitCount = 20) => {
     try {
-      if (!query || query.trim().length < 2) return [];
+      if (!searchTerm || searchTerm.trim().length < 2) return [];
 
       const postsRef = collection(db, COLLECTIONS.POSTS);
-      const searchQuery = query.toLowerCase().trim();
+      const searchQuery = searchTerm.toLowerCase().trim();
 
       // Note: This is a basic search. For production, consider using Algolia or similar
       const q = query(
@@ -1285,12 +1286,12 @@ export const searchService = {
   },
 
   // Search events
-  searchEvents: async (query, limitCount = 20) => {
+  searchEvents: async (searchTerm, limitCount = 20) => {
     try {
-      if (!query || query.trim().length < 2) return [];
+      if (!searchTerm || searchTerm.trim().length < 2) return [];
 
       const eventsRef = collection(db, COLLECTIONS.EVENTS);
-      const searchQuery = query.toLowerCase().trim();
+      const searchQuery = searchTerm.toLowerCase().trim();
 
       // Search by title
       const titleQuery = query(
@@ -1585,7 +1586,7 @@ export const callService = {
       const callerDoc = await getDoc(doc(db, COLLECTIONS.USERS, callerId));
       const callerData = callerDoc.data();
 
-      // Create notification data
+      // Create notification data with callActive flag and timestamp
       const notificationData = {
         userId: receiverId,
         fromUserId: callerId,
@@ -1597,6 +1598,8 @@ export const callService = {
           callerName: callerData?.fullName,
           callerAvatar: callerData?.avatar,
           callType,
+          callActive: true,
+          callStartTime: Date.now(),
         },
       };
 
@@ -1614,19 +1617,232 @@ export const callService = {
           callerName: callerData?.fullName,
           callerAvatar: callerData?.avatar,
           callType,
+          callActive: true,
           categoryId: "calls",
         },
       };
 
       // Create notification with push
-      await notificationService.createNotificationWithPush(
-        notificationData,
-        pushData
+      const notificationId =
+        await notificationService.createNotificationWithPush(
+          notificationData,
+          pushData
+        );
+
+      return notificationId;
+    } catch (error) {
+      console.error("Error sending call notification:", error);
+      throw error;
+    }
+  },
+
+  // Cancel call notification when caller ends the call
+  cancelCallNotification: async (receiverId, channelName) => {
+    try {
+      // Find and update the call notification to mark it as inactive
+      const notificationsRef = collection(db, COLLECTIONS.NOTIFICATIONS);
+      const q = query(
+        notificationsRef,
+        where("userId", "==", receiverId),
+        where("read", "==", false),
+        orderBy("createdAt", "desc"),
+        limit(10)
       );
+
+      const snapshot = await getDocs(q);
+      const callNotification = snapshot.docs.find(
+        (doc) =>
+          (doc.data().type === "call_voice" ||
+            doc.data().type === "call_video") &&
+          doc.data().data?.channelName === channelName &&
+          doc.data().data?.callActive === true
+      );
+
+      if (callNotification) {
+        await updateDoc(callNotification.ref, {
+          "data.callActive": false,
+          "data.callEndTime": Date.now(),
+          read: true,
+        });
+      }
 
       return true;
     } catch (error) {
-      console.error("Error sending call notification:", error);
+      console.error("Error canceling call notification:", error);
+      throw error;
+    }
+  },
+};
+
+// LIVE STREAM SERVICES
+export const liveStreamService = {
+  // Create live stream
+  createLiveStream: async (streamData) => {
+    try {
+      const stream = {
+        ...streamData,
+        isActive: true,
+        viewerCount: 0,
+        viewers: [],
+        createdAt: serverTimestamp(),
+        startedAt: serverTimestamp(),
+      };
+
+      const docRef = await addDoc(
+        collection(db, COLLECTIONS.LIVE_STREAMS),
+        stream
+      );
+      return { id: docRef.id, ...stream };
+    } catch (error) {
+      console.error("Error creating live stream:", error);
+      throw error;
+    }
+  },
+
+  // Get live stream
+  getLiveStream: async (streamId) => {
+    try {
+      const streamDoc = await getDoc(
+        doc(db, COLLECTIONS.LIVE_STREAMS, streamId)
+      );
+      if (streamDoc.exists()) {
+        return { id: streamDoc.id, ...streamDoc.data() };
+      }
+      return null;
+    } catch (error) {
+      console.error("Error getting live stream:", error);
+      throw error;
+    }
+  },
+
+  // End live stream
+  endLiveStream: async (streamId) => {
+    try {
+      await updateDoc(doc(db, COLLECTIONS.LIVE_STREAMS, streamId), {
+        isActive: false,
+        endedAt: serverTimestamp(),
+      });
+      return true;
+    } catch (error) {
+      console.error("Error ending live stream:", error);
+      throw error;
+    }
+  },
+
+  // Join live stream (increment viewer count)
+  joinLiveStream: async (streamId) => {
+    try {
+      const streamRef = doc(db, COLLECTIONS.LIVE_STREAMS, streamId);
+      await updateDoc(streamRef, {
+        viewerCount: increment(1),
+      });
+      return true;
+    } catch (error) {
+      console.error("Error joining live stream:", error);
+      throw error;
+    }
+  },
+
+  // Leave live stream (decrement viewer count)
+  leaveLiveStream: async (streamId) => {
+    try {
+      const streamRef = doc(db, COLLECTIONS.LIVE_STREAMS, streamId);
+      await updateDoc(streamRef, {
+        viewerCount: increment(-1),
+      });
+      return true;
+    } catch (error) {
+      console.error("Error leaving live stream:", error);
+      throw error;
+    }
+  },
+
+  // Subscribe to live stream updates
+  subscribeToLiveStream: (streamId, callback) => {
+    try {
+      const streamRef = doc(db, COLLECTIONS.LIVE_STREAMS, streamId);
+      return onSnapshot(streamRef, (doc) => {
+        if (doc.exists()) {
+          callback({ id: doc.id, ...doc.data() });
+        } else {
+          callback(null);
+        }
+      });
+    } catch (error) {
+      console.error("Error subscribing to live stream:", error);
+      throw error;
+    }
+  },
+
+  // Get active live streams
+  getActiveLiveStreams: async (limitCount = 20) => {
+    try {
+      const streamsRef = collection(db, COLLECTIONS.LIVE_STREAMS);
+      const q = query(
+        streamsRef,
+        where("isActive", "==", true),
+        orderBy("startedAt", "desc"),
+        limit(limitCount)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        startedAt: doc.data().startedAt?.toDate(),
+        createdAt: doc.data().createdAt?.toDate(),
+      }));
+    } catch (error) {
+      console.error("Error getting active live streams:", error);
+      throw error;
+    }
+  },
+
+  // Subscribe to active live streams
+  subscribeToActiveLiveStreams: (callback, limitCount = 20) => {
+    try {
+      const streamsRef = collection(db, COLLECTIONS.LIVE_STREAMS);
+      const q = query(
+        streamsRef,
+        where("isActive", "==", true),
+        orderBy("startedAt", "desc"),
+        limit(limitCount)
+      );
+
+      return onSnapshot(q, (snapshot) => {
+        const streams = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          startedAt: doc.data().startedAt?.toDate(),
+          createdAt: doc.data().createdAt?.toDate(),
+        }));
+        callback(streams);
+      });
+    } catch (error) {
+      console.error("Error subscribing to active live streams:", error);
+      throw error;
+    }
+  },
+
+  // Get user's live streams
+  getUserLiveStreams: async (userId, limitCount = 10) => {
+    try {
+      const streamsRef = collection(db, COLLECTIONS.LIVE_STREAMS);
+      const q = query(
+        streamsRef,
+        where("userId", "==", userId),
+        orderBy("startedAt", "desc"),
+        limit(limitCount)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        startedAt: doc.data().startedAt?.toDate(),
+        createdAt: doc.data().createdAt?.toDate(),
+        endedAt: doc.data().endedAt?.toDate(),
+      }));
+    } catch (error) {
+      console.error("Error getting user live streams:", error);
       throw error;
     }
   },

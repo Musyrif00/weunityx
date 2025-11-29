@@ -13,6 +13,5 @@
   },
   "compileOnSave": true,
   "include": ["src"],
-  "exclude": ["node_modules"],
-  "extends": "expo/tsconfig.base"
+  "exclude": ["node_modules"]
 }

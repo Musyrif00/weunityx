@@ -38,6 +38,11 @@ import BlockedUsersScreen from "../screens/BlockedUsers";
 import VideoCallScreen from "../screens/VideoCall";
 import VoiceCallScreen from "../screens/VoiceCall";
 
+// Live Stream screens
+import LiveStreamScreen from "../screens/LiveStream/LiveStream";
+import ViewLiveStreamScreen from "../screens/LiveStream/ViewLiveStream";
+import LiveStreamsListScreen from "../screens/LiveStream/LiveStreamsList";
+
 import { useAuth } from "../contexts/AuthContext";
 
 const Tab = createBottomTabNavigator();
@@ -85,6 +90,8 @@ const TabNavigator = () => {
         name="Search"
         component={SearchScreen}
         options={{
+          headerTitle: "Sense",
+          tabBarLabel: "Sense",
           tabBarIcon: ({ color, size }) => (
             <TabIcon name="magnify" color={color} size={size} />
           ),
@@ -103,6 +110,8 @@ const TabNavigator = () => {
         name="Messages"
         component={MessagesScreen}
         options={{
+          headerTitle: "Chat",
+          tabBarLabel: "Chat",
           tabBarIcon: ({ color, size }) => (
             <TabIcon name="message" color={color} size={size} />
           ),
@@ -166,7 +175,11 @@ const AppNavigator = () => {
           />
           <Stack.Screen name="Chat" component={ChatScreen} />
           <Stack.Screen name="NewMessage" component={NewMessageScreen} />
-          <Stack.Screen name="NewPost" component={NewPostScreen} />
+          <Stack.Screen
+            name="NewPost"
+            component={NewPostScreen}
+            options={{ headerTitle: "New Sense" }}
+          />
           <Stack.Screen name="NewStory" component={NewStoryScreen} />
           <Stack.Screen name="Comments" component={CommentsScreen} />
           <Stack.Screen name="UserProfile" component={UserProfileScreen} />
@@ -184,6 +197,21 @@ const AppNavigator = () => {
             name="VoiceCall"
             component={VoiceCallScreen}
             options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="LiveStream"
+            component={LiveStreamScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ViewLiveStream"
+            component={ViewLiveStreamScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="LiveStreamsList"
+            component={LiveStreamsListScreen}
+            options={{ title: "Live Streams" }}
           />
           <Stack.Screen
             name="TransactionHistory"

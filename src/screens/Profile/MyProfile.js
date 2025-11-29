@@ -149,6 +149,17 @@ const ProfileScreen = ({ navigation }) => {
         <Text style={styles.menuTitle}>Menu</Text>
 
         <View style={styles.menuItem}>
+          <IconButton icon="video-wireless" />
+          <Text style={styles.menuText}>Go Live</Text>
+          <IconButton
+            icon="chevron-right"
+            onPress={() => navigation.navigate("LiveStream")}
+          />
+        </View>
+
+        <Divider />
+
+        <View style={styles.menuItem}>
           <IconButton icon="account-group" />
           <Text style={styles.menuText}>Friends</Text>
           <IconButton

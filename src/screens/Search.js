@@ -113,7 +113,7 @@ const SearchScreen = ({ navigation }) => {
     <User
       user={{
         id: item.id,
-        name: item.fullName || item.name,
+        fullName: item.fullName || item.name,
         username: item.username,
         avatar: item.avatar,
         bio: item.bio,
@@ -158,7 +158,7 @@ const SearchScreen = ({ navigation }) => {
       return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={staticTheme.colors.primary} />
-          <Text style={styles.loadingText}>Searching...</Text>
+          <Text style={styles.loadingText}>Sensing...</Text>
         </View>
       );
     }
@@ -199,7 +199,7 @@ const SearchScreen = ({ navigation }) => {
 
   const SearchFilters = () => (
     <View style={styles.filtersContainer}>
-      {["users", "posts", "events"].map((type) => (
+      {["users", "posts"].map((type) => (
         <Chip
           key={type}
           selected={searchType === type}
@@ -224,7 +224,7 @@ const SearchScreen = ({ navigation }) => {
       </View>
       <View style={styles.searchContainer}>
         <Searchbar
-          placeholder={`Search ${searchType} on WeUnityX`}
+          placeholder={`Sense ${searchType} on WeUnityX`}
           onChangeText={handleSearch}
           value={searchQuery}
           style={styles.searchbar}

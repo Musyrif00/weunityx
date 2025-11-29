@@ -85,3 +85,8 @@ yarn-error.*
 .firebase/
 firebase-debug.log
 firestore-debug.log
+
+# Documentation (local development notes)
+PROJECT_PROGRESS.md
+WALLET_SETUP.md
+FIREBASE_MORALIS_SETUP.md
