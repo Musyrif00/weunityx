@@ -113,7 +113,18 @@ const VoiceCallScreen = ({ route, navigation }) => {
         },
         onUserOffline: (_connection, uid, reason) => {
           setRemoteUid(null);
-          Alert.alert("Call Ended", `${otherUser?.fullName} left the call`);
+          // End the call immediately when the other person leaves
+          Alert.alert(
+            "Call Ended",
+            `${otherUser?.fullName} left the call`,
+            [
+              {
+                text: "OK",
+                onPress: () => handleEndCall(),
+              },
+            ],
+            { cancelable: false }
+          );
         },
         onError: (err, msg) => {
           Alert.alert("Call Error", `Error: ${msg}`);

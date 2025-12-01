@@ -12,6 +12,7 @@ import {
   createAgoraRtcEngine,
   ChannelProfileType,
   ClientRoleType,
+  RtcSurfaceView,
 } from "react-native-agora";
 import { AGORA_APP_ID } from "../config/agora";
 import { theme } from "../constants/theme";
@@ -100,7 +101,18 @@ const VideoCallScreen = ({ route, navigation }) => {
         },
         onUserOffline: (_connection, uid) => {
           setRemoteUid(null);
-          Alert.alert("Call Ended", `${otherUser?.fullName} left the call`);
+          // End the call immediately when the other person leaves
+          Alert.alert(
+            "Call Ended",
+            `${otherUser?.fullName} left the call`,
+            [
+              {
+                text: "OK",
+                onPress: () => handleEndCall(),
+              },
+            ],
+            { cancelable: false }
+          );
         },
       });
 
@@ -173,18 +185,26 @@ const VideoCallScreen = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Video Placeholder - Agora v4 requires additional video view setup */}
-      <View style={styles.videoPlaceholder}>
-        <Text style={styles.placeholderText}>
-          {remoteUid
-            ? `In call with ${otherUser?.fullName}`
-            : `Calling ${otherUser?.fullName}...`}
-        </Text>
-        <Text style={styles.placeholderSubtext}>
-          Video rendering requires Agora Video View component
-        </Text>
-        <Text style={styles.placeholderSubtext}>Audio call is working</Text>
-      </View>
+      {/* Remote Video (Full Screen) */}
+      {remoteUid ? (
+        <RtcSurfaceView
+          canvas={{ uid: remoteUid }}
+          style={styles.remoteVideo}
+        />
+      ) : (
+        <View style={styles.waitingContainer}>
+          <Text style={styles.waitingText}>
+            Calling {otherUser?.fullName}...
+          </Text>
+        </View>
+      )}
+
+      {/* Local Video (Picture-in-Picture) */}
+      {videoEnabled && (
+        <View style={styles.localVideoContainer}>
+          <RtcSurfaceView canvas={{ uid: 0 }} style={styles.localVideo} />
+        </View>
+      )}
 
       {/* Controls */}
       <View style={styles.controlsContainer}>
@@ -252,25 +272,39 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000",
   },
-  videoPlaceholder: {
+  remoteVideo: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+  },
+  waitingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: theme.colors.primary,
-    padding: 20,
   },
-  placeholderText: {
+  waitingText: {
     color: "white",
     fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 20,
   },
-  placeholderSubtext: {
-    color: "rgba(255, 255, 255, 0.7)",
-    fontSize: 14,
-    textAlign: "center",
-    marginTop: 8,
+  localVideoContainer: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 60 : 40,
+    right: 20,
+    width: 120,
+    height: 160,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "white",
+    backgroundColor: "#000",
+  },
+  localVideo: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
   },
   controlsContainer: {
     position: "absolute",
@@ -298,8 +332,11 @@ const styles = StyleSheet.create({
   },
   userInfo: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 60 : 40,
+    top: Platform.OS === "ios" ? 220 : 200,
     left: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    padding: 12,
+    borderRadius: 8,
   },
   userName: {
     color: "white",

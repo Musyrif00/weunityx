@@ -8,6 +8,7 @@ import {
   StatusBar,
   Text as RNText,
   BackHandler,
+  PermissionsAndroid,
 } from "react-native";
 import { Text, IconButton, Badge } from "react-native-paper";
 import { useFocusEffect } from "@react-navigation/native";
@@ -16,6 +17,8 @@ import {
   ChannelProfileType,
   ClientRoleType,
   RtcSurfaceView,
+  RenderModeType,
+  VideoMirrorModeType,
 } from "react-native-agora";
 import { useAuth } from "../../contexts/AuthContext";
 import { liveStreamService } from "../../services/firebase";
@@ -32,6 +35,7 @@ const LiveStreamScreen = ({ navigation }) => {
   const [viewerCount, setViewerCount] = useState(0);
   const [streamId, setStreamId] = useState(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [isPreviewReady, setIsPreviewReady] = useState(false);
   const agoraEngineRef = useRef(null);
   const channelName = useRef(`live_${user.uid}_${Date.now()}`);
   const unsubscribeRef = useRef(null);
@@ -76,6 +80,27 @@ const LiveStreamScreen = ({ navigation }) => {
     }, [isStreaming, isPaused])
   );
 
+  const requestPermissions = async () => {
+    if (Platform.OS === "android") {
+      try {
+        const granted = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+        ]);
+        return (
+          granted["android.permission.RECORD_AUDIO"] ===
+            PermissionsAndroid.RESULTS.GRANTED &&
+          granted["android.permission.CAMERA"] ===
+            PermissionsAndroid.RESULTS.GRANTED
+        );
+      } catch (err) {
+        console.error("Permission error:", err);
+        return false;
+      }
+    }
+    return true;
+  };
+
   const initializeAgora = async () => {
     try {
       if (!AGORA_APP_ID) {
@@ -83,37 +108,48 @@ const LiveStreamScreen = ({ navigation }) => {
         return;
       }
 
+      // Request permissions first
+      const hasPermission = await requestPermissions();
+      if (!hasPermission) {
+        Alert.alert(
+          "Permission Denied",
+          "Camera and microphone access are required for live streaming"
+        );
+        navigation.goBack();
+        return;
+      }
+
       // Create Agora engine instance
       const engine = createAgoraRtcEngine();
       agoraEngineRef.current = engine;
 
-      // Initialize engine
+      // Initialize engine with Communication profile
       engine.initialize({
         appId: AGORA_APP_ID,
-        channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting,
+        channelProfile: ChannelProfileType.ChannelProfileCommunication,
       });
-
-      // Enable video
-      engine.enableVideo();
-
-      // Set client role to broadcaster
-      engine.setClientRole(ClientRoleType.ClientRoleBroadcaster);
 
       // Register event handlers
       engine.registerEventHandler({
-        onUserJoined: (_connection, uid) => {
-          console.log("Viewer joined:", uid);
-        },
-        onUserOffline: (_connection, uid, reason) => {
-          console.log("Viewer left:", uid);
-        },
-        onError: (err) => {
-          console.error("Agora Error:", err);
+        onError: (err, msg) => {
+          console.error("Agora Error:", err, msg);
         },
       });
+
+      // Enable video and audio before preview
+      engine.enableVideo();
+      engine.enableAudio();
+
+      // Start preview
+      await engine.startPreview();
+
+      // Force re-render to show the video
+      setTimeout(() => {
+        setIsPreviewReady(true);
+      }, 300);
     } catch (error) {
       console.error("Error initializing Agora:", error);
-      Alert.alert("Error", "Failed to initialize streaming");
+      Alert.alert("Error", "Failed to initialize streaming: " + error.message);
     }
   };
 
@@ -124,25 +160,41 @@ const LiveStreamScreen = ({ navigation }) => {
         return;
       }
 
-      // Generate Agora token
-      const token = await generateAgoraToken(channelName.current, user.uid);
+      // Generate Agora token for publisher role
+      const token = await generateAgoraToken(
+        channelName.current,
+        0,
+        "publisher"
+      );
 
-      // Create live stream in Firebase
+      // Create live stream in Firebase with host UID
       const stream = await liveStreamService.createLiveStream({
         userId: user.uid,
         channelName: channelName.current,
         title: `${user.displayName || user.username}'s Live`,
+        hostUid: 0, // Store host's Agora UID so viewers know who to watch
       });
 
       setStreamId(stream.id);
 
-      // Join channel
+      // Re-register event handlers right before joining
+      agoraEngineRef.current.registerEventHandler({
+        onError: (err, msg) => {
+          console.error("Agora Error:", err, msg);
+        },
+      });
+
+      // Join channel as broadcaster
       await agoraEngineRef.current.joinChannel(
         token,
         channelName.current,
         null,
         0
       );
+
+      // Ensure local video/audio are not muted
+      await agoraEngineRef.current.muteLocalVideoStream(false);
+      await agoraEngineRef.current.muteLocalAudioStream(false);
 
       setIsStreaming(true);
 
@@ -289,6 +341,7 @@ const LiveStreamScreen = ({ navigation }) => {
         unsubscribeRef.current();
       }
       if (agoraEngineRef.current) {
+        agoraEngineRef.current.stopPreview();
         agoraEngineRef.current.leaveChannel();
         agoraEngineRef.current.release();
       }
@@ -306,20 +359,26 @@ const LiveStreamScreen = ({ navigation }) => {
 
       {/* Video Preview/Stream */}
       <View style={styles.videoContainer}>
-        {isStreaming && isCameraOn && !isPaused ? (
-          <RtcSurfaceView
-            canvas={{ uid: 0 }}
-            style={styles.video}
-            zOrderMediaOverlay={true}
-          />
+        {isCameraOn && !isPaused ? (
+          isPreviewReady ? (
+            <RtcSurfaceView
+              key="livestream-preview"
+              canvas={{
+                uid: 0,
+                renderMode: RenderModeType.RenderModeHidden,
+                mirrorMode: VideoMirrorModeType.VideoMirrorModeAuto,
+              }}
+              style={styles.video}
+            />
+          ) : (
+            <View style={styles.noVideoContainer}>
+              <Text style={styles.noVideoText}>Initializing camera...</Text>
+            </View>
+          )
         ) : (
           <View style={styles.noVideoContainer}>
             <Text style={styles.noVideoText}>
-              {isPaused
-                ? "Stream Paused"
-                : !isStreaming
-                ? "Ready to go live"
-                : "Camera is off"}
+              {isPaused ? "Stream Paused" : "Camera is off"}
             </Text>
             {isPaused && (
               <Text style={styles.pausedSubText}>
@@ -417,9 +476,13 @@ const styles = StyleSheet.create({
   },
   videoContainer: {
     flex: 1,
+    width: "100%",
+    height: "100%",
   },
   video: {
     flex: 1,
+    width: "100%",
+    height: "100%",
   },
   noVideoContainer: {
     flex: 1,

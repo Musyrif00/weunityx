@@ -1747,9 +1747,17 @@ export const liveStreamService = {
   leaveLiveStream: async (streamId) => {
     try {
       const streamRef = doc(db, COLLECTIONS.LIVE_STREAMS, streamId);
-      await updateDoc(streamRef, {
-        viewerCount: increment(-1),
-      });
+      const streamDoc = await getDoc(streamRef);
+
+      if (streamDoc.exists()) {
+        const currentCount = streamDoc.data().viewerCount || 0;
+        // Only decrement if count is greater than 0
+        if (currentCount > 0) {
+          await updateDoc(streamRef, {
+            viewerCount: increment(-1),
+          });
+        }
+      }
       return true;
     } catch (error) {
       console.error("Error leaving live stream:", error);
