@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateAgoraToken = exports.searchTokens = exports.getWalletSummary = exports.getTokenPrice = exports.getNFTs = exports.getTransactions = exports.getWalletBalances = exports.getTokenBalances = exports.getNativeBalance = void 0;
+exports.cleanupOldLiveStreams = exports.generateAgoraToken = exports.searchTokens = exports.getWalletSummary = exports.getTokenPrice = exports.getNFTs = exports.getTransactions = exports.getWalletBalances = exports.getTokenBalances = exports.getNativeBalance = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const moralis_1 = require("moralis");
@@ -14,12 +14,11 @@ const weiToEth = (wei) => {
 // Initialize Moralis
 let moralisInitialized = false;
 const initializeMoralis = async () => {
-    var _a;
     if (moralisInitialized)
         return;
-    const apiKey = (_a = functions.config().moralis) === null || _a === void 0 ? void 0 : _a.api_key;
+    const apiKey = process.env.MORALIS_API_KEY;
     if (!apiKey) {
-        throw new Error('Moralis API key not configured. Set it with: firebase functions:config:set moralis.api_key="YOUR_KEY"');
+        throw new Error('Moralis API key not configured. Set MORALIS_API_KEY in functions/.env file');
     }
     await moralis_1.default.start({
         apiKey: apiKey,
@@ -330,18 +329,17 @@ exports.searchTokens = functions.https.onCall(async (data, context) => {
 });
 // Generate Agora RTC Token
 exports.generateAgoraToken = functions.https.onCall(async (data, context) => {
-    var _a, _b;
     try {
         const { channelName, uid = 0, role = "publisher" } = data;
         // Validate input
         if (!channelName) {
             throw new functions.https.HttpsError("invalid-argument", "Channel name is required");
         }
-        // Get Agora credentials from Firebase config
-        const appId = (_a = functions.config().agora) === null || _a === void 0 ? void 0 : _a.app_id;
-        const appCertificate = (_b = functions.config().agora) === null || _b === void 0 ? void 0 : _b.certificate;
+        // Get Agora credentials from environment variables
+        const appId = process.env.AGORA_APP_ID;
+        const appCertificate = process.env.AGORA_APP_CERTIFICATE;
         if (!appId || !appCertificate) {
-            throw new functions.https.HttpsError("failed-precondition", 'Agora credentials not configured. Set them with: firebase functions:config:set agora.app_id="YOUR_APP_ID" agora.certificate="YOUR_CERTIFICATE"');
+            throw new functions.https.HttpsError("failed-precondition", 'Agora credentials not configured. Set AGORA_APP_ID and AGORA_APP_CERTIFICATE in functions/.env file');
         }
         // Token expiration time (24 hours from now)
         const expirationTimeInSeconds = 86400; // 24 hours
@@ -363,6 +361,56 @@ exports.generateAgoraToken = functions.https.onCall(async (data, context) => {
     catch (error) {
         console.error("generateAgoraToken error:", error);
         throw new functions.https.HttpsError("internal", `Failed to generate Agora token: ${error}`);
+    }
+});
+// Scheduled function to clean up old live streams (runs daily at midnight)
+exports.cleanupOldLiveStreams = functions.pubsub
+    .schedule("0 0 * * *") // Run at midnight every day
+    .timeZone("UTC")
+    .onRun(async (context) => {
+    try {
+        console.log("Starting cleanup of old live streams...");
+        const db = admin.firestore();
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        // Query for streams older than 30 days that are not active
+        const oldStreamsQuery = db
+            .collection("liveStreams")
+            .where("isActive", "==", false)
+            .where("endedAt", "<", thirtyDaysAgo);
+        const snapshot = await oldStreamsQuery.get();
+        if (snapshot.empty) {
+            console.log("No old streams to delete");
+            return null;
+        }
+        // Delete streams in batches (Firestore limit is 500 per batch)
+        const batchSize = 500;
+        let deletedCount = 0;
+        let batch = db.batch();
+        let batchCount = 0;
+        for (const doc of snapshot.docs) {
+            batch.delete(doc.ref);
+            batchCount++;
+            deletedCount++;
+            // Commit batch when it reaches 500 operations
+            if (batchCount === batchSize) {
+                await batch.commit();
+                console.log(`Committed batch of ${batchCount} deletions`);
+                batch = db.batch();
+                batchCount = 0;
+            }
+        }
+        // Commit remaining operations
+        if (batchCount > 0) {
+            await batch.commit();
+            console.log(`Committed final batch of ${batchCount} deletions`);
+        }
+        console.log(`Successfully deleted ${deletedCount} old live streams (older than 30 days)`);
+        return { deletedCount };
+    }
+    catch (error) {
+        console.error("Error cleaning up old live streams:", error);
+        throw error;
     }
 });
 //# sourceMappingURL=index.js.map

@@ -85,6 +85,8 @@ yarn-error.*
 .firebase/
 firebase-debug.log
 firestore-debug.log
+functions/.env
+functions/.env.*
 
 # Documentation (local development notes)
 PROJECT_PROGRESS.md

@@ -7,8 +7,10 @@ import {
   Platform,
   StatusBar,
   Text as RNText,
+  BackHandler,
 } from "react-native";
 import { Text, IconButton, Badge } from "react-native-paper";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   createAgoraRtcEngine,
   ChannelProfileType,
@@ -29,16 +31,50 @@ const LiveStreamScreen = ({ navigation }) => {
   const [isFrontCamera, setIsFrontCamera] = useState(true);
   const [viewerCount, setViewerCount] = useState(0);
   const [streamId, setStreamId] = useState(null);
+  const [isPaused, setIsPaused] = useState(false);
   const agoraEngineRef = useRef(null);
   const channelName = useRef(`live_${user.uid}_${Date.now()}`);
   const unsubscribeRef = useRef(null);
+  const isUnmountingRef = useRef(false);
 
   useEffect(() => {
     initializeAgora();
     return () => {
+      isUnmountingRef.current = true;
       cleanup();
     };
   }, []);
+
+  // Handle back button and navigation events
+  useFocusEffect(
+    React.useCallback(() => {
+      // Screen is focused
+      if (isPaused && isStreaming) {
+        // Resume the stream
+        resumeStream();
+      }
+
+      // Handle hardware back button on Android
+      const onBackPress = () => {
+        if (isStreaming) {
+          handleNavigateAway();
+          return true; // Prevent default back action
+        }
+        return false; // Allow default back action
+      };
+
+      BackHandler.addEventListener("hardwareBackPress", onBackPress);
+
+      return () => {
+        // Screen is unfocused
+        if (isStreaming && !isUnmountingRef.current) {
+          // Pause the stream when navigating away
+          pauseStream();
+        }
+        BackHandler.removeEventListener("hardwareBackPress", onBackPress);
+      };
+    }, [isStreaming, isPaused])
+  );
 
   const initializeAgora = async () => {
     try {
@@ -125,8 +161,62 @@ const LiveStreamScreen = ({ navigation }) => {
     }
   };
 
+  const pauseStream = async () => {
+    try {
+      console.log("Pausing stream...");
+      if (agoraEngineRef.current) {
+        // Disable local video and audio when paused
+        await agoraEngineRef.current.enableLocalVideo(false);
+        await agoraEngineRef.current.muteLocalAudioStream(true);
+      }
+      setIsPaused(true);
+    } catch (error) {
+      console.error("Error pausing stream:", error);
+    }
+  };
+
+  const resumeStream = async () => {
+    try {
+      console.log("Resuming stream...");
+      if (agoraEngineRef.current) {
+        // Re-enable video and audio based on previous state
+        await agoraEngineRef.current.enableLocalVideo(isCameraOn);
+        await agoraEngineRef.current.muteLocalAudioStream(isMuted);
+      }
+      setIsPaused(false);
+    } catch (error) {
+      console.error("Error resuming stream:", error);
+    }
+  };
+
+  const handleNavigateAway = () => {
+    Alert.alert(
+      "Live Stream Active",
+      "You have an active live stream. What would you like to do?",
+      [
+        {
+          text: "Continue Streaming",
+          onPress: () => {
+            // Stay on the screen
+          },
+          style: "cancel",
+        },
+        {
+          text: "End Stream",
+          onPress: () => {
+            endLiveStream();
+          },
+          style: "destructive",
+        },
+      ],
+      { cancelable: false }
+    );
+  };
+
   const endLiveStream = async () => {
     try {
+      isUnmountingRef.current = true;
+
       if (agoraEngineRef.current) {
         await agoraEngineRef.current.leaveChannel();
       }
@@ -140,6 +230,7 @@ const LiveStreamScreen = ({ navigation }) => {
       }
 
       setIsStreaming(false);
+      setIsPaused(false);
       navigation.goBack();
     } catch (error) {
       console.error("Error ending live stream:", error);
@@ -215,7 +306,7 @@ const LiveStreamScreen = ({ navigation }) => {
 
       {/* Video Preview/Stream */}
       <View style={styles.videoContainer}>
-        {isStreaming && isCameraOn ? (
+        {isStreaming && isCameraOn && !isPaused ? (
           <RtcSurfaceView
             canvas={{ uid: 0 }}
             style={styles.video}
@@ -224,22 +315,42 @@ const LiveStreamScreen = ({ navigation }) => {
         ) : (
           <View style={styles.noVideoContainer}>
             <Text style={styles.noVideoText}>
-              {!isStreaming ? "Ready to go live" : "Camera is off"}
+              {isPaused
+                ? "Stream Paused"
+                : !isStreaming
+                ? "Ready to go live"
+                : "Camera is off"}
             </Text>
+            {isPaused && (
+              <Text style={styles.pausedSubText}>
+                Your stream is paused. Return to this screen to resume.
+              </Text>
+            )}
           </View>
         )}
       </View>
 
       {/* Top Controls */}
       <View style={styles.topControls}>
-        <TouchableOpacity style={styles.backButton} onPress={navigation.goBack}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => {
+            if (isStreaming) {
+              handleNavigateAway();
+            } else {
+              navigation.goBack();
+            }
+          }}
+        >
           <IconButton icon="arrow-left" iconColor="#fff" size={24} />
         </TouchableOpacity>
 
         {isStreaming && (
           <View style={styles.liveIndicator}>
-            <View style={styles.liveBadge}>
-              <RNText style={styles.liveText}>LIVE</RNText>
+            <View style={[styles.liveBadge, isPaused && styles.pausedBadge]}>
+              <RNText style={styles.liveText}>
+                {isPaused ? "PAUSED" : "LIVE"}
+              </RNText>
             </View>
             <View style={styles.viewerBadge}>
               <IconButton icon="eye" iconColor="#fff" size={16} />
@@ -321,6 +432,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
   },
+  pausedSubText: {
+    color: "#ccc",
+    fontSize: 14,
+    marginTop: spacing.sm,
+    textAlign: "center",
+    paddingHorizontal: spacing.xl,
+  },
   topControls: {
     position: "absolute",
     top: Platform.OS === "ios" ? 50 : 20,
@@ -345,6 +463,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: 4,
+  },
+  pausedBadge: {
+    backgroundColor: "#FFA500",
   },
   liveText: {
     color: "#fff",
