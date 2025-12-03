@@ -99,11 +99,13 @@ const ViewLiveStreamScreen = ({ route, navigation }) => {
       const engine = createAgoraRtcEngine();
       agoraEngineRef.current = engine;
 
-      // Initialize engine with Communication profile
+      // Initialize engine with LiveBroadcasting profile for streaming
       engine.initialize({
         appId: AGORA_APP_ID,
-        channelProfile: ChannelProfileType.ChannelProfileCommunication,
+        channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting,
       });
+
+      console.log("✅ Agora engine initialized with LiveBroadcasting profile");
 
       // Enable video and audio to receive streams
       engine.enableVideo();
@@ -112,109 +114,8 @@ const ViewLiveStreamScreen = ({ route, navigation }) => {
       // Set speaker on for live streams
       engine.setDefaultAudioRouteToSpeakerphone(true);
 
-      // Register event handlers
-      engine.registerEventHandler({
-        onJoinChannelSuccess: async (connection, elapsed) => {
-          console.log("✅ Successfully joined channel as viewer!");
-          console.log("Connection:", connection, "Elapsed:", elapsed);
-          setIsConnected(true);
-
-          // NOW setup remote video for the broadcaster
-          const uid = broadcasterUidRef.current;
-          console.log("📺 Setting up remote video for broadcaster UID:", uid);
-
-          try {
-            await engine.setupRemoteVideo({
-              uid: uid,
-              renderMode: RenderModeType.RenderModeHidden,
-            });
-            console.log("✅ Remote video setup complete");
-
-            // Subscribe to broadcaster's streams
-            await engine.muteRemoteVideoStream(uid, false);
-            await engine.muteRemoteAudioStream(uid, false);
-            console.log("✅ Subscribed to broadcaster streams");
-
-            setHostUid(uid);
-          } catch (error) {
-            console.error("❌ Error in onJoinChannelSuccess:", error);
-          }
-        },
-        onUserJoined: (_connection, uid) => {
-          console.log("👤 User joined, UID:", uid);
-          // Setup remote video for this user
-          try {
-            engine.setupRemoteVideo({
-              uid: uid,
-              renderMode: RenderModeType.RenderModeHidden,
-            });
-            console.log("📺 Setup remote video for UID:", uid);
-          } catch (error) {
-            console.error("Error setting up remote video:", error);
-          }
-          setHostUid(uid);
-        },
-        onUserOffline: (_connection, uid, reason) => {
-          console.log("👋 User left, UID:", uid);
-          setHostUid(null);
-          Alert.alert("Stream Ended", "The host has ended the live stream");
-          navigation.goBack();
-        },
-        onRemoteVideoStateChanged: (_connection, uid, state, reason) => {
-          console.log(
-            "📹 Remote video state changed - UID:",
-            uid,
-            "State:",
-            state,
-            "Reason:",
-            reason
-          );
-          // State 2 = Decoding (video is playing)
-          if (state === 2) {
-            console.log("✅ Host video is now playing, UID:", uid);
-            setHostUid(uid);
-            setIsConnected(true);
-          }
-        },
-        onError: (err, msg) => {
-          console.error("❌ Agora Error:", err, msg);
-        },
-        onConnectionStateChanged: (_connection, state, reason) => {
-          console.log(
-            "🔌 Connection state changed - State:",
-            state,
-            "Reason:",
-            reason
-          );
-        },
-        onFirstRemoteVideoFrame: (_connection, uid, width, height, elapsed) => {
-          console.log(
-            "🎬 First remote video frame received - UID:",
-            uid,
-            "Size:",
-            width,
-            "x",
-            height
-          );
-          // Setup remote video when first frame arrives
-          try {
-            engine.setupRemoteVideo({
-              uid: uid,
-              renderMode: RenderModeType.RenderModeHidden,
-            });
-            console.log("📺 Setup remote video for UID:", uid);
-          } catch (error) {
-            console.error("Error setting up remote video:", error);
-          }
-          setHostUid(uid);
-        },
-        onError: (err, msg) => {
-          console.error("❌ Agora Error:", err, msg);
-        },
-        onWarning: (warn, msg) => {
-          console.warn("⚠️ Agora Warning:", warn, msg);
-        },
-      });
+      // Event handlers will be registered in joinStream() to avoid being overwritten
+      console.log("✅ Viewer setup complete, waiting for stream data...");
     } catch (error) {
       console.error("Error initializing Agora:", error);
       Alert.alert("Error", "Failed to connect to stream");
@@ -229,9 +130,15 @@ const ViewLiveStreamScreen = ({ route, navigation }) => {
 
   const joinStream = async () => {
     try {
-      if (!streamData || !agoraEngineRef.current) return;
+      if (!streamData || !agoraEngineRef.current) {
+        console.log("❌ Missing streamData or agora engine");
+        return;
+      }
 
       console.log("Generating token for viewer...");
+      console.log("Channel:", streamData.channelName);
+      console.log("Host UID:", streamData.hostUid);
+
       // Generate unique numeric UID for viewer (hash the user.uid to get a number != 0)
       // Generate unique numeric UID for viewer
       const viewerUid =
@@ -241,63 +148,114 @@ const ViewLiveStreamScreen = ({ route, navigation }) => {
           1000000) +
         1;
 
+      console.log("Viewer UID:", viewerUid);
+
       // Generate Agora token for audience role
-      const token = await generateAgoraToken(
-        streamData.channelName,
-        viewerUid,
-        "audience"
-      );
+      let token;
+      try {
+        const tokenResult = await generateAgoraToken(
+          streamData.channelName,
+          viewerUid,
+          "audience"
+        );
+        token = tokenResult.token;
+        console.log("✅ Token generated successfully");
+        console.log("Token length:", token.length);
+      } catch (tokenError) {
+        console.error("❌ Token generation failed:", tokenError);
+        Alert.alert(
+          "Error",
+          "Failed to generate stream token: " + tokenError.message
+        );
+        return;
+      }
 
       // Store broadcaster UID for use in callback
       broadcasterUidRef.current = streamData.hostUid || 0;
 
-      // Re-register event handlers right before joining
+      // Set client role to audience
       const engine = agoraEngineRef.current;
+      await engine.setClientRole(ClientRoleType.ClientRoleAudience);
+      console.log("✅ Client role set to audience");
+
+      // Re-register event handlers right before joining
       engine.registerEventHandler({
         onJoinChannelSuccess: async () => {
+          console.log("✅ Viewer joined channel successfully");
           setIsConnected(true);
-
-          // Setup remote video for the broadcaster
-          const uid = broadcasterUidRef.current;
+        },
+        onUserJoined: async (_connection, uid) => {
+          console.log("👤 Broadcaster joined with UID:", uid);
 
           try {
+            // Setup remote video for the broadcaster when they join
             await engine.setupRemoteVideo({
               uid: uid,
               renderMode: RenderModeType.RenderModeHidden,
             });
+            console.log("📺 Remote video setup for UID:", uid);
 
             // Subscribe to broadcaster's streams
             await engine.muteRemoteVideoStream(uid, false);
             await engine.muteRemoteAudioStream(uid, false);
+            console.log("✅ Subscribed to broadcaster streams");
 
             setHostUid(uid);
           } catch (error) {
-            console.error("Error setting up remote video:", error);
+            console.error("❌ Error setting up remote video:", error);
           }
         },
-        onUserJoined: (_connection, uid) => {
-          setHostUid(uid);
-        },
         onUserOffline: () => {
+          console.log("👋 Broadcaster left");
           setHostUid(null);
           Alert.alert("Stream Ended", "The host has ended the live stream");
           navigation.goBack();
         },
+        onRemoteVideoStateChanged: (_connection, uid, state, reason) => {
+          console.log(
+            "📹 Remote video state:",
+            state,
+            "UID:",
+            uid,
+            "Reason:",
+            reason
+          );
+          if (state === 2) {
+            console.log("✅ Remote video decoding started");
+            setHostUid(uid);
+          }
+        },
         onError: (err, msg) => {
-          console.error("Agora Error:", err, msg);
+          console.error("❌ Agora Error:", err, msg);
         },
       });
 
       // Join channel
-      await agoraEngineRef.current.joinChannel(
+      console.log("📡 Calling joinChannel...");
+      console.log("Parameters:", {
+        token: token ? `${token.substring(0, 20)}...` : "null",
+        channel: streamData.channelName,
+        uid: viewerUid,
+        role: "audience",
+      });
+
+      const result = await agoraEngineRef.current.joinChannel(
         token,
         streamData.channelName,
-        null,
-        viewerUid
+        viewerUid,
+        {
+          channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting,
+          clientRoleType: ClientRoleType.ClientRoleAudience,
+          publishMicrophoneTrack: false,
+          publishCameraTrack: false,
+          autoSubscribeAudio: true,
+          autoSubscribeVideo: true,
+        }
       );
+      console.log("📡 joinChannel result:", result);
     } catch (error) {
-      console.error("Error joining stream:", error);
-      Alert.alert("Error", "Failed to join stream");
+      console.error("❌ Error joining stream:", error);
+      Alert.alert("Error", "Failed to join stream: " + error.message);
     }
   };
 

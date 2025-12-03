@@ -8,7 +8,7 @@ import { WalletProvider } from "./src/contexts/WalletContext";
 import AppNavigator from "./src/navigation/AppNavigator";
 import PushNotificationService from "./src/services/pushNotifications";
 import IncomingCallModal from "./src/components/IncomingCallModal";
-import { notificationService } from "./src/services/firebase";
+import { notificationService, callService } from "./src/services/firebase";
 
 // Initialize Firebase before anything else
 import "./src/config/firebase";
@@ -107,8 +107,17 @@ const NavigationWrapper = () => {
               });
               setShowIncomingCall(true);
             } else {
-              // Auto-dismiss old call notification
+              // Auto-dismiss old call notification and mark as inactive
               notificationService.markNotificationAsRead(callNotification.id);
+              // Also update callActive to false
+              callService
+                .cancelCallNotification(
+                  user.uid,
+                  callNotification.data.channelName
+                )
+                .catch((err) =>
+                  console.error("Error canceling old call:", err)
+                );
             }
           } else if (showIncomingCall) {
             // Call was canceled, hide the modal

@@ -27,7 +27,10 @@
         "ACCESS_COARSE_LOCATION"
       ],
       "package": "com.weunityx.test",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "config": {
+        "largeHeap": true
+      }
     },
     "web": {
       "bundler": "metro",

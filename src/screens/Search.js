@@ -65,17 +65,6 @@ const SearchScreen = ({ navigation }) => {
           );
           searchResults = postsWithUsers;
           break;
-        case "events":
-          searchResults = await searchService.searchEvents(query);
-          // Load user data for events
-          const eventsWithUsers = await Promise.all(
-            searchResults.map(async (event) => {
-              const eventUser = await userService.getUser(event.userId);
-              return { ...event, user: eventUser };
-            })
-          );
-          searchResults = eventsWithUsers;
-          break;
         default:
           break;
       }
@@ -138,21 +127,6 @@ const SearchScreen = ({ navigation }) => {
     />
   );
 
-  const renderEvent = ({ item }) => (
-    <PaperCard style={styles.eventCard}>
-      <PaperCard.Content>
-        <Text style={styles.eventTitle}>{item.title}</Text>
-        <Text style={styles.eventDescription} numberOfLines={2}>
-          {item.description}
-        </Text>
-        <Text style={styles.eventDate}>
-          {item.date?.toLocaleDateString()} at {item.date?.toLocaleTimeString()}
-        </Text>
-        <Text style={styles.eventLocation}>{item.location?.address}</Text>
-      </PaperCard.Content>
-    </PaperCard>
-  );
-
   const renderSearchResults = () => {
     if (loading) {
       return (
@@ -179,8 +153,6 @@ const SearchScreen = ({ navigation }) => {
           return renderUser;
         case "posts":
           return renderPost;
-        case "events":
-          return renderEvent;
         default:
           return renderUser;
       }
@@ -302,30 +274,6 @@ const styles = StyleSheet.create({
   },
   postItem: {
     marginBottom: spacing.md,
-  },
-  eventCard: {
-    marginBottom: spacing.md,
-    marginHorizontal: spacing.md,
-  },
-  eventTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: staticTheme.colors.text,
-    marginBottom: spacing.xs,
-  },
-  eventDescription: {
-    fontSize: 14,
-    color: staticTheme.colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  eventDate: {
-    fontSize: 12,
-    color: staticTheme.colors.primary,
-    marginBottom: spacing.xs,
-  },
-  eventLocation: {
-    fontSize: 12,
-    color: staticTheme.colors.textSecondary,
   },
   loadingContainer: {
     flex: 1,

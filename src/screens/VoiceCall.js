@@ -169,6 +169,17 @@ const VoiceCallScreen = ({ route, navigation }) => {
     }
   };
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (otherUser?.id && channelName) {
+        callService
+          .cancelCallNotification(otherUser.id, channelName)
+          .catch((err) => console.error("Cleanup error:", err));
+      }
+    };
+  }, [otherUser?.id, channelName]);
+
   const toggleMute = () => {
     if (agoraEngineRef.current) {
       agoraEngineRef.current.muteLocalAudioStream(!muted);

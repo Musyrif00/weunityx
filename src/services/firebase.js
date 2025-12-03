@@ -30,7 +30,6 @@ import { db, storage } from "../config/firebase";
 export const COLLECTIONS = {
   USERS: "users",
   POSTS: "posts",
-  EVENTS: "events",
   MESSAGES: "messages",
   CHATS: "chats",
   NOTIFICATIONS: "notifications",
@@ -120,6 +119,45 @@ export const userService = {
           followers: arrayUnion(currentUserId),
           followersCount: increment(1),
         });
+
+        // Send follow notification
+        try {
+          const currentUserData = await userService.getUser(currentUserId);
+
+          const notificationData = {
+            userId: targetUserId,
+            fromUserId: currentUserId,
+            type: "follow",
+            message: `${
+              currentUserData?.fullName || "Someone"
+            } started following you`,
+          };
+
+          const pushData = {
+            title: "New Follower",
+            body: `${
+              currentUserData?.fullName || "Someone"
+            } started following you`,
+            data: {
+              type: "follow",
+              fromUserId: currentUserId,
+              categoryId: "follows",
+              screen: "UserProfile",
+              params: { user: { id: currentUserId } },
+            },
+          };
+
+          await notificationService.createNotificationWithPush(
+            notificationData,
+            pushData
+          );
+        } catch (notificationError) {
+          console.error(
+            "Error sending follow notification:",
+            notificationError
+          );
+          // Don't fail the follow operation if notification fails
+        }
       }
       return true;
     } catch (error) {
@@ -730,124 +768,6 @@ export const reportingService = {
   },
 };
 
-// EVENT SERVICES
-export const eventService = {
-  // Create event
-  createEvent: async (eventData, imageFile = null) => {
-    try {
-      let imageUrl = null;
-
-      if (imageFile) {
-        const imageRef = ref(storage, `events/${Date.now()}_${imageFile.name}`);
-        const snapshot = await uploadBytes(imageRef, imageFile);
-        imageUrl = await getDownloadURL(snapshot.ref);
-      }
-
-      const event = {
-        ...eventData,
-        image: imageUrl,
-        attendees: [],
-        attendeesCount: 0,
-        interested: [],
-        interestedCount: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-
-      const docRef = await addDoc(collection(db, COLLECTIONS.EVENTS), event);
-      return { id: docRef.id, ...event };
-    } catch (error) {
-      console.error("Error creating event:", error);
-      throw error;
-    }
-  },
-
-  // Get events
-  getEvents: async (limitCount = 20) => {
-    try {
-      const eventsRef = collection(db, COLLECTIONS.EVENTS);
-      const q = query(eventsRef, orderBy("date", "asc"), limit(limitCount));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        date: doc.data().date?.toDate(),
-        createdAt: doc.data().createdAt?.toDate(),
-        updatedAt: doc.data().updatedAt?.toDate(),
-      }));
-    } catch (error) {
-      console.error("Error getting events:", error);
-      throw error;
-    }
-  },
-
-  // Get event details
-  getEvent: async (eventId) => {
-    try {
-      const eventDoc = await getDoc(doc(db, COLLECTIONS.EVENTS, eventId));
-      if (eventDoc.exists()) {
-        const data = eventDoc.data();
-        return {
-          id: eventDoc.id,
-          ...data,
-          date: data.date?.toDate(),
-          createdAt: data.createdAt?.toDate(),
-          updatedAt: data.updatedAt?.toDate(),
-        };
-      }
-      return null;
-    } catch (error) {
-      console.error("Error getting event:", error);
-      throw error;
-    }
-  },
-
-  // Join/Leave event
-  toggleAttendance: async (eventId, userId, isAttending) => {
-    try {
-      const eventRef = doc(db, COLLECTIONS.EVENTS, eventId);
-
-      if (isAttending) {
-        await updateDoc(eventRef, {
-          attendees: arrayRemove(userId),
-          attendeesCount: increment(-1),
-        });
-      } else {
-        await updateDoc(eventRef, {
-          attendees: arrayUnion(userId),
-          attendeesCount: increment(1),
-        });
-      }
-      return true;
-    } catch (error) {
-      console.error("Error toggling attendance:", error);
-      throw error;
-    }
-  },
-
-  // Subscribe to events with real-time updates
-  subscribeToEvents: (callback, limitCount = 20) => {
-    try {
-      const eventsRef = collection(db, COLLECTIONS.EVENTS);
-      const q = query(eventsRef, orderBy("date", "asc"), limit(limitCount));
-
-      return onSnapshot(q, (snapshot) => {
-        const events = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-          date: doc.data().date?.toDate(),
-          createdAt: doc.data().createdAt?.toDate(),
-          updatedAt: doc.data().updatedAt?.toDate(),
-        }));
-        callback(events);
-      });
-    } catch (error) {
-      console.error("Error subscribing to events:", error);
-      throw error;
-    }
-  },
-};
-
 // CHAT SERVICES
 export const chatService = {
   // Get user chats
@@ -1281,62 +1201,6 @@ export const searchService = {
       }));
     } catch (error) {
       console.error("Error searching posts:", error);
-      throw error;
-    }
-  },
-
-  // Search events
-  searchEvents: async (searchTerm, limitCount = 20) => {
-    try {
-      if (!searchTerm || searchTerm.trim().length < 2) return [];
-
-      const eventsRef = collection(db, COLLECTIONS.EVENTS);
-      const searchQuery = searchTerm.toLowerCase().trim();
-
-      // Search by title
-      const titleQuery = query(
-        eventsRef,
-        where("title", ">=", searchQuery),
-        where("title", "<=", searchQuery + "\uf8ff"),
-        limit(limitCount)
-      );
-
-      // Search by description
-      const descQuery = query(
-        eventsRef,
-        where("description", ">=", searchQuery),
-        where("description", "<=", searchQuery + "\uf8ff"),
-        limit(limitCount)
-      );
-
-      const [titleSnapshot, descSnapshot] = await Promise.all([
-        getDocs(titleQuery),
-        getDocs(descQuery),
-      ]);
-
-      const events = new Map();
-
-      titleSnapshot.docs.forEach((doc) => {
-        events.set(doc.id, {
-          id: doc.id,
-          ...doc.data(),
-          date: doc.data().date?.toDate(),
-          createdAt: doc.data().createdAt?.toDate(),
-        });
-      });
-
-      descSnapshot.docs.forEach((doc) => {
-        events.set(doc.id, {
-          id: doc.id,
-          ...doc.data(),
-          date: doc.data().date?.toDate(),
-          createdAt: doc.data().createdAt?.toDate(),
-        });
-      });
-
-      return Array.from(events.values());
-    } catch (error) {
-      console.error("Error searching events:", error);
       throw error;
     }
   },

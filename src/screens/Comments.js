@@ -97,8 +97,15 @@ const CommentsScreen = ({ route, navigation }) => {
       setComments((prev) => [...prev, tempComment]);
       setNewComment("");
 
+      // Get current user data for notification
+      const currentUserData = await userService.getUser(user.uid);
+
       // Add to Firebase
-      const newCommentData = await postService.addComment(post.id, commentData);
+      const newCommentData = await postService.addComment(
+        post.id,
+        commentData,
+        currentUserData
+      );
 
       // Update with real comment data
       setComments((prev) =>

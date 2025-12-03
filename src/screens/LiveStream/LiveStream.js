@@ -123,11 +123,13 @@ const LiveStreamScreen = ({ navigation }) => {
       const engine = createAgoraRtcEngine();
       agoraEngineRef.current = engine;
 
-      // Initialize engine with Communication profile
+      // Initialize engine with LiveBroadcasting profile for streaming
       engine.initialize({
         appId: AGORA_APP_ID,
-        channelProfile: ChannelProfileType.ChannelProfileCommunication,
+        channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting,
       });
+
+      console.log("✅ Agora engine initialized with LiveBroadcasting profile");
 
       // Register event handlers
       engine.registerEventHandler({
@@ -160,37 +162,70 @@ const LiveStreamScreen = ({ navigation }) => {
         return;
       }
 
+      // Generate unique numeric UID for broadcaster
+      const broadcasterUid =
+        (Math.abs(
+          user.uid.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
+        ) %
+          1000000) +
+        1;
+
+      console.log("📡 Broadcaster UID:", broadcasterUid);
+      console.log("📡 Channel:", channelName.current);
+
       // Generate Agora token for publisher role
-      const token = await generateAgoraToken(
+      const tokenResult = await generateAgoraToken(
         channelName.current,
-        0,
+        broadcasterUid,
         "publisher"
       );
+
+      const token = tokenResult.token;
+      console.log("✅ Token generated");
+
+      // Set client role to broadcaster
+      await agoraEngineRef.current.setClientRole(
+        ClientRoleType.ClientRoleBroadcaster
+      );
+      console.log("✅ Client role set to broadcaster");
 
       // Create live stream in Firebase with host UID
       const stream = await liveStreamService.createLiveStream({
         userId: user.uid,
         channelName: channelName.current,
         title: `${user.displayName || user.username}'s Live`,
-        hostUid: 0, // Store host's Agora UID so viewers know who to watch
+        hostUid: broadcasterUid, // Store host's Agora UID so viewers know who to watch
       });
 
       setStreamId(stream.id);
+      console.log("✅ Stream created in Firebase:", stream.id);
 
       // Re-register event handlers right before joining
       agoraEngineRef.current.registerEventHandler({
+        onJoinChannelSuccess: (connection, elapsed) => {
+          console.log("✅ Broadcaster joined channel successfully");
+        },
         onError: (err, msg) => {
-          console.error("Agora Error:", err, msg);
+          console.error("❌ Agora Error:", err, msg);
         },
       });
 
       // Join channel as broadcaster
-      await agoraEngineRef.current.joinChannel(
+      console.log("📡 Joining channel as broadcaster...");
+      const joinResult = await agoraEngineRef.current.joinChannel(
         token,
         channelName.current,
-        null,
-        0
+        broadcasterUid,
+        {
+          channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting,
+          clientRoleType: ClientRoleType.ClientRoleBroadcaster,
+          publishMicrophoneTrack: true,
+          publishCameraTrack: true,
+          autoSubscribeAudio: true,
+          autoSubscribeVideo: true,
+        }
       );
+      console.log("📡 Join channel result:", joinResult);
 
       // Ensure local video/audio are not muted
       await agoraEngineRef.current.muteLocalVideoStream(false);

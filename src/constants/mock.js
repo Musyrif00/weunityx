@@ -43,28 +43,7 @@ export const mockPosts = [
   },
 ];
 
-export const mockEvents = [
-  {
-    id: 1,
-    title: "Tech Meetup 2023",
-    description: "Join us for an evening of networking and tech talks",
-    date: new Date("2023-12-20T19:00:00"),
-    location: "Tech Hub, Downtown",
-    attendees: 45,
-    image: "https://picsum.photos/400/200?random=3",
-    createdBy: 1,
-  },
-  {
-    id: 2,
-    title: "Photography Workshop",
-    description: "Learn the basics of portrait photography",
-    date: new Date("2023-12-15T10:00:00"),
-    location: "Creative Studio",
-    attendees: 12,
-    image: "https://picsum.photos/400/200?random=4",
-    createdBy: 2,
-  },
-];
+// Events removed - mockEvents was here
 
 export const mockMessages = [
   {

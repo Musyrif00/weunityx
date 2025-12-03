@@ -210,7 +210,7 @@ const ChatScreen = ({ route, navigation }) => {
             icon="phone"
             onPress={async () => {
               // Sort user IDs to ensure same channel name regardless of who initiates
-              const sortedIds = [user.uid, otherParticipantData?.id].sort();
+              const sortedIds = [user.uid, otherParticipant].sort();
               const channelName =
                 currentChat?.id || `call_${sortedIds[0]}_${sortedIds[1]}`;
 
@@ -218,7 +218,7 @@ const ChatScreen = ({ route, navigation }) => {
               try {
                 await callService.sendCallNotification(
                   user.uid,
-                  otherParticipantData?.id,
+                  otherParticipant,
                   channelName,
                   "voice"
                 );
@@ -236,7 +236,7 @@ const ChatScreen = ({ route, navigation }) => {
             icon="video"
             onPress={async () => {
               // Sort user IDs to ensure same channel name regardless of who initiates
-              const sortedIds = [user.uid, otherParticipantData?.id].sort();
+              const sortedIds = [user.uid, otherParticipant].sort();
               const channelName =
                 currentChat?.id || `call_${sortedIds[0]}_${sortedIds[1]}`;
 
@@ -244,7 +244,7 @@ const ChatScreen = ({ route, navigation }) => {
               try {
                 await callService.sendCallNotification(
                   user.uid,
-                  otherParticipantData?.id,
+                  otherParticipant,
                   channelName,
                   "video"
                 );

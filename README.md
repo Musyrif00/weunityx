@@ -9,7 +9,6 @@ React Native social media app with live streaming, video calls, and Web3 wallet 
 - 📞 Video/voice calls
 - 💬 Real-time chat
 - 💰 Multi-chain wallet
-- 📅 Events & RSVP
 
 ## Tech Stack
 

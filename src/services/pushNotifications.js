@@ -121,13 +121,6 @@ class PushNotificationService {
         lightColor: "#00FF00",
       });
 
-      await Notifications.setNotificationChannelAsync("events", {
-        name: "Events",
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: "#FFA500",
-      });
-
       await Notifications.setNotificationChannelAsync("messages", {
         name: "Messages",
         importance: Notifications.AndroidImportance.MAX,
@@ -157,12 +150,6 @@ class PushNotificationService {
           title: "New Follower",
           body: `${data.userName} started following you`,
           categoryId: "follows",
-        };
-      case "event":
-        return {
-          title: "Event Update",
-          body: `${data.userName} is interested in your event`,
-          categoryId: "events",
         };
       case "message":
         return {

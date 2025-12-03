@@ -26,8 +26,6 @@ const NotificationItem = ({ notification, onPress, users }) => {
         return "comment";
       case "follow":
         return "account-plus";
-      case "event":
-        return "calendar";
       case "story":
         return "camera";
       case "call_voice":
@@ -47,8 +45,6 @@ const NotificationItem = ({ notification, onPress, users }) => {
         return staticTheme.colors.primary;
       case "follow":
         return "#4CAF50";
-      case "event":
-        return "#FF9800";
       case "story":
         return "#9C27B0";
       case "call_voice":
@@ -67,8 +63,6 @@ const NotificationItem = ({ notification, onPress, users }) => {
         return "commented on your post";
       case "follow":
         return "started following you";
-      case "event":
-        return "is interested in your event";
       case "story":
         return "viewed your story";
       default:
@@ -230,13 +224,6 @@ const NotificationsScreen = ({ navigation }) => {
           navigation.navigate("UserProfile", {
             user: users[notification.fromUserId],
           });
-          break;
-        case "event":
-          if (notification.eventId) {
-            navigation.navigate("EventDetail", {
-              event: { id: notification.eventId },
-            });
-          }
           break;
         case "call_voice":
           if (notification.data?.channelName) {

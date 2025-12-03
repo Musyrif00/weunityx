@@ -1,7 +1,7 @@
 import React from "react";
 import { Image, StyleSheet } from "react-native";
 
-// HeaderLogo - Specifically for main screen headers (Home, Messages, Events, Profile)
+// HeaderLogo - Specifically for main screen headers (Home, Messages, Profile)
 // Uses inlinelogo.jpg and can be resized from one place
 const HeaderLogo = ({ style }) => {
   return (
