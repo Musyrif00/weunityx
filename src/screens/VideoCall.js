@@ -112,9 +112,40 @@ const VideoCallScreen = ({ route, navigation }) => {
           console.log("✅ Joined channel successfully");
           setJoined(true);
         },
-        onUserJoined: (_connection, uid) => {
+        onUserJoined: async (_connection, uid) => {
           console.log("👤 Remote user joined with UID:", uid);
           setRemoteUid(uid);
+
+          // Fix preview bug: simulate double-pressing video button
+          setTimeout(async () => {
+            if (agoraEngine) {
+              console.log("🔄 Auto-toggling camera twice for preview fix...");
+
+              // First toggle: Turn OFF
+              agoraEngine.muteLocalVideoStream(true);
+              agoraEngine.enableLocalVideo(false);
+              agoraEngine.stopPreview();
+              setLocalVideoReady(false);
+              setVideoEnabled(false);
+
+              await new Promise((resolve) => setTimeout(resolve, 200));
+
+              // Second toggle: Turn ON
+              agoraEngine.muteLocalVideoStream(false);
+              agoraEngine.enableLocalVideo(true);
+
+              await agoraEngine.setupLocalVideo({
+                uid: 0,
+                renderMode: RenderModeType.RenderModeHidden,
+              });
+
+              agoraEngine.startPreview();
+              setLocalVideoReady(true);
+              setVideoEnabled(true);
+
+              console.log("✅ Camera toggled twice - preview refreshed");
+            }
+          }, 500);
         },
         onRemoteVideoStateChanged: (_connection, uid, state, reason) => {
           console.log("📹 Remote video state changed:", { uid, state, reason });
@@ -156,11 +187,21 @@ const VideoCallScreen = ({ route, navigation }) => {
       // Set speaker on by default for video calls
       agoraEngine.setDefaultAudioRouteToSpeakerphone(true);
 
-      // Start preview first
-      agoraEngine.startPreview();
+      // Setup local video for preview BEFORE joining
+      await agoraEngine.setupLocalVideo({
+        uid: 0,
+        renderMode: RenderModeType.RenderModeHidden,
+      });
+      console.log("✅ Local video setup completed for UID 0");
 
-      // Small delay to ensure preview starts
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      // Start preview before joining to ensure local video shows immediately
+      agoraEngine.startPreview();
+      console.log("✅ Preview started");
+
+      // Small delay to ensure preview is actually rendering
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Set ready - the RtcSurfaceView should now show the preview
       setLocalVideoReady(true);
 
       // Join channel with token and publish camera/mic
@@ -219,7 +260,7 @@ const VideoCallScreen = ({ route, navigation }) => {
     }
   };
 
-  const toggleVideo = () => {
+  const toggleVideo = async () => {
     if (agoraEngineRef.current) {
       const newState = !videoEnabled;
       // Enable or disable local video capture and publishing
@@ -227,6 +268,13 @@ const VideoCallScreen = ({ route, navigation }) => {
         // Turn camera ON
         agoraEngineRef.current.muteLocalVideoStream(false);
         agoraEngineRef.current.enableLocalVideo(true);
+
+        // Re-setup local video for preview
+        await agoraEngineRef.current.setupLocalVideo({
+          uid: 0,
+          renderMode: RenderModeType.RenderModeHidden,
+        });
+
         agoraEngineRef.current.startPreview();
         setLocalVideoReady(true);
       } else {
@@ -285,12 +333,13 @@ const VideoCallScreen = ({ route, navigation }) => {
       )}
 
       {/* Local Video (Picture-in-Picture) */}
-      {videoEnabled && localVideoReady && localUid && (
+      {videoEnabled && localVideoReady && (
         <View style={styles.localVideoContainer}>
           <RtcSurfaceView
+            key={`local-preview`}
             canvas={{
-              uid: localUid,
-              sourceType: VideoSourceType.VideoSourceCamera,
+              uid: 0,
+              renderMode: RenderModeType.RenderModeHidden,
             }}
             style={styles.localVideo}
           />
