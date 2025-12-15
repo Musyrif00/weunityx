@@ -4,11 +4,11 @@ React Native social media app with live streaming, video calls, and Web3 wallet 
 
 ## Features
 
-- 📱 Social posts, stories, comments, likes
-- 🎥 Live streaming (Agora)
-- 📞 Video/voice calls
-- 💬 Real-time chat
-- 💰 Multi-chain wallet
+- Social posts, stories, comments, likes
+- Live streaming (Agora)
+- Video/voice calls
+- Real-time chat
+- Multi-chain wallet
 
 ## Tech Stack
 
@@ -23,7 +23,7 @@ npx expo start --dev-client
 
 ## Setup
 
-Requires Firebase, Agora, and Moralis configuration. See `PROJECT_PROGRESS.md` for details.
+Requires Firebase, Agora, and Moralis configuration.
 
 ---
 
