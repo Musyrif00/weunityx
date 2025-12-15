@@ -1,7 +1,7 @@
-// Agora Configuration
+// Agora Configuration from environment variables
 // Get your App ID from: https://console.agora.io/
 
-export const AGORA_APP_ID = "b090121457c24ebb8eb674a312d79192";
+export const AGORA_APP_ID = process.env.EXPO_PUBLIC_AGORA_APP_ID;
 
 // You'll need to implement a token server for production
 // For development/testing, you can use null (less secure)
@@ -9,10 +9,11 @@ export const AGORA_APP_ID = "b090121457c24ebb8eb674a312d79192";
 export const AGORA_TOKEN = null;
 
 // Optional: Certificate for token generation (for production)
-export const AGORA_CERTIFICATE = "63c295d6f8304198b67c71933ab00068";
+export const AGORA_CERTIFICATE =
+  process.env.EXPO_PUBLIC_AGORA_CERTIFICATE || "";
 
 export default {
-  appId: "b090121457c24ebb8eb674a312d79192",
+  appId: process.env.EXPO_PUBLIC_AGORA_APP_ID,
   token: null,
-  certificate: "63c295d6f8304198b67c71933ab00068",
+  certificate: process.env.EXPO_PUBLIC_AGORA_CERTIFICATE || "",
 };

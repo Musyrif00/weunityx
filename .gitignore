@@ -88,9 +88,6 @@ firestore-debug.log
 functions/.env
 functions/.env.*
 google-services.json
-src/config/firebase.js
-src/config/agora.js
-src/config/moralis.js
 
 # GitHub Copilot
 .github/copilot-instructions.md
