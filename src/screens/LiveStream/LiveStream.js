@@ -9,6 +9,7 @@ import {
   Text as RNText,
   BackHandler,
   PermissionsAndroid,
+  AppState,
 } from "react-native";
 import { Text, IconButton, Badge } from "react-native-paper";
 import { useFocusEffect } from "@react-navigation/native";
@@ -40,6 +41,7 @@ const LiveStreamScreen = ({ navigation }) => {
   const channelName = useRef(`live_${user.uid}_${Date.now()}`);
   const unsubscribeRef = useRef(null);
   const isUnmountingRef = useRef(false);
+  const appState = useRef(AppState.currentState);
 
   useEffect(() => {
     initializeAgora();
@@ -48,6 +50,27 @@ const LiveStreamScreen = ({ navigation }) => {
       cleanup();
     };
   }, []);
+
+  // Handle app state changes (background/foreground)
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (
+        appState.current.match(/active/) &&
+        nextAppState.match(/inactive|background/)
+      ) {
+        // App has gone to the background while streaming
+        if (isStreaming) {
+          console.log("App went to background - ending stream");
+          endLiveStream();
+        }
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription?.remove();
+    };
+  }, [isStreaming]);
 
   // Handle back button and navigation events
   useFocusEffect(
@@ -304,25 +327,45 @@ const LiveStreamScreen = ({ navigation }) => {
     try {
       isUnmountingRef.current = true;
 
-      if (agoraEngineRef.current) {
-        await agoraEngineRef.current.leaveChannel();
-      }
-
-      if (streamId) {
-        await liveStreamService.endLiveStream(streamId);
-      }
-
+      // Unsubscribe first to avoid state updates
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+
+      // Leave Agora channel
+      if (agoraEngineRef.current) {
+        try {
+          await agoraEngineRef.current.leaveChannel();
+        } catch (error) {
+          console.error("Error leaving channel:", error);
+        }
+      }
+
+      // End stream in Firebase
+      if (streamId) {
+        try {
+          await liveStreamService.endLiveStream(streamId);
+          setStreamId(null);
+        } catch (error) {
+          console.error("Error ending stream in Firebase:", error);
+        }
       }
 
       setIsStreaming(false);
       setIsPaused(false);
-      navigation.goBack();
+      setViewerCount(0);
+
+      // Navigate back if possible
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      }
     } catch (error) {
       console.error("Error ending live stream:", error);
-      Alert.alert("Error", "Failed to end stream properly");
-      navigation.goBack();
+      // Still try to navigate back
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      }
     }
   };
 
@@ -372,16 +415,30 @@ const LiveStreamScreen = ({ navigation }) => {
 
   const cleanup = async () => {
     try {
+      // Unsubscribe from Firebase updates
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
+        unsubscribeRef.current = null;
       }
+
+      // Clean up Agora engine
       if (agoraEngineRef.current) {
-        agoraEngineRef.current.stopPreview();
-        agoraEngineRef.current.leaveChannel();
-        agoraEngineRef.current.release();
+        try {
+          await agoraEngineRef.current.stopPreview();
+          await agoraEngineRef.current.leaveChannel();
+          agoraEngineRef.current.release();
+        } catch (error) {
+          console.error("Error cleaning up Agora:", error);
+        }
       }
+
+      // End stream in Firebase if still active
       if (streamId && isStreaming) {
-        await liveStreamService.endLiveStream(streamId);
+        try {
+          await liveStreamService.endLiveStream(streamId);
+        } catch (error) {
+          console.error("Error ending stream in cleanup:", error);
+        }
       }
     } catch (error) {
       console.error("Error cleaning up:", error);

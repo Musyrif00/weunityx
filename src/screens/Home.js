@@ -6,10 +6,10 @@ import {
   RefreshControl,
   Image,
   Alert,
-  ScrollView,
   TouchableOpacity,
   Dimensions,
   Share,
+  Modal,
 } from "react-native";
 import { Video } from "expo-av";
 import {
@@ -31,269 +31,339 @@ import {
   savedPostsService,
 } from "../services/firebase";
 
-const PostCard = ({
-  post,
-  user: postUser,
-  onLike,
-  onComment,
-  onSave,
-  navigation,
-}) => {
-  const { user: currentUser } = useAuth();
+// Memoize PostCard to prevent unnecessary re-renders
+const PostCard = React.memo(
+  ({ post, user: postUser, onLike, onComment, onSave, navigation }) => {
+    const { user: currentUser } = useAuth();
 
-  // Always use light theme (disabled dynamic theming)
-  const theme = staticTheme;
+    // Always use light theme (disabled dynamic theming)
+    const theme = staticTheme;
 
-  const [liked, setLiked] = useState(
-    post.likes?.includes(currentUser?.uid) || false
-  );
-  const [saved, setSaved] = useState(false);
-  const [likesCount, setLikesCount] = useState(post.likesCount || 0);
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [showPostMenu, setShowPostMenu] = useState(false);
+    const [liked, setLiked] = useState(
+      post.likes?.includes(currentUser?.uid) || false
+    );
+    const [saved, setSaved] = useState(false);
+    const [likesCount, setLikesCount] = useState(post.likesCount || 0);
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [showPostMenu, setShowPostMenu] = useState(false);
+    const [imageViewerVisible, setImageViewerVisible] = useState(false);
+    const [videoViewerVisible, setVideoViewerVisible] = useState(false);
 
-  // Check if post is saved when component mounts
-  useEffect(() => {
-    if (!currentUser) return;
+    // Check if post is saved when component mounts
+    useEffect(() => {
+      if (!currentUser) return;
 
-    const checkIfSaved = async () => {
+      const checkIfSaved = async () => {
+        try {
+          const isSaved = await savedPostsService.isPostSaved(
+            currentUser.uid,
+            post.id
+          );
+          setSaved(isSaved);
+        } catch (error) {
+          console.error("Error checking if post is saved:", error);
+        }
+      };
+
+      checkIfSaved();
+    }, [currentUser?.uid, post.id]);
+
+    const handleLike = async () => {
+      if (!currentUser) return;
+
       try {
-        const isSaved = await savedPostsService.isPostSaved(
+        const wasLiked = liked;
+        setLiked(!liked);
+        setLikesCount((prev) => (wasLiked ? prev - 1 : prev + 1));
+
+        // Get current user data for notification
+        const currentUserData = await userService.getUser(currentUser.uid);
+
+        await postService.toggleLike(
+          post.id,
           currentUser.uid,
-          post.id
+          wasLiked,
+          currentUserData
         );
-        setSaved(isSaved);
+        onLike?.(post.id, !wasLiked);
       } catch (error) {
-        console.error("Error checking if post is saved:", error);
+        // Revert optimistic update on error
+        setLiked(liked);
+        setLikesCount(post.likesCount || 0);
+        console.error("Error toggling like:", error);
+        Alert.alert("Error", "Failed to update like status");
       }
     };
 
-    checkIfSaved();
-  }, [currentUser?.uid, post.id]);
+    const handleComment = () => {
+      onComment?.(post);
+    };
 
-  const handleLike = async () => {
-    if (!currentUser) return;
+    const handleSave = async () => {
+      try {
+        const wasSaved = saved;
+        setSaved(!saved);
 
-    try {
-      const wasLiked = liked;
-      setLiked(!liked);
-      setLikesCount((prev) => (wasLiked ? prev - 1 : prev + 1));
-
-      // Get current user data for notification
-      const currentUserData = await userService.getUser(currentUser.uid);
-
-      await postService.toggleLike(
-        post.id,
-        currentUser.uid,
-        wasLiked,
-        currentUserData
-      );
-      onLike?.(post.id, !wasLiked);
-    } catch (error) {
-      // Revert optimistic update on error
-      setLiked(liked);
-      setLikesCount(post.likesCount || 0);
-      console.error("Error toggling like:", error);
-      Alert.alert("Error", "Failed to update like status");
-    }
-  };
-
-  const handleComment = () => {
-    onComment?.(post);
-  };
-
-  const handleSave = async () => {
-    try {
-      const wasSaved = saved;
-      setSaved(!saved);
-
-      await savedPostsService.toggleSavePost(
-        currentUser.uid,
-        post.id,
-        wasSaved
-      );
-      onSave?.(post.id, !wasSaved);
-    } catch (error) {
-      // Revert optimistic update on error
-      setSaved(saved);
-      console.error("Error toggling save:", error);
-      Alert.alert("Error", "Failed to save/unsave post");
-    }
-  };
-
-  const handleShare = async () => {
-    try {
-      const shareContent = `Check out this post by ${
-        postUser?.fullName || "someone"
-      } on WeUnityX!\n\n"${post.content || "New post"}"`;
-
-      const result = await Share.share({
-        message: shareContent,
-        title: "Share Post from WeUnityX",
-      });
-
-      if (result.action === Share.sharedAction) {
-        // Post was shared successfully
-        // Share functionality here
+        await savedPostsService.toggleSavePost(
+          currentUser.uid,
+          post.id,
+          wasSaved
+        );
+        onSave?.(post.id, !wasSaved);
+      } catch (error) {
+        // Revert optimistic update on error
+        setSaved(saved);
+        console.error("Error toggling save:", error);
+        Alert.alert("Error", "Failed to save/unsave post");
       }
-    } catch (error) {
-      console.error("Error sharing post:", error);
-      Alert.alert("Error", "Failed to share post");
-    }
-  };
+    };
 
-  const handleBlockUser = async () => {
-    try {
-      Alert.alert(
-        "Block User",
-        `Are you sure you want to block ${
-          postUser?.fullName || "this user"
-        }? You won't see their posts anymore.`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Block",
-            style: "destructive",
-            onPress: async () => {
-              await blockingService.blockUser(currentUser.uid, post.userId);
-              Alert.alert("Success", "User has been blocked");
+    const handleShare = async () => {
+      try {
+        const shareContent = `Check out this post by ${
+          postUser?.fullName || "someone"
+        } on WeUnityX!\n\n"${post.content || "New post"}"`;
+
+        const result = await Share.share({
+          message: shareContent,
+          title: "Share Post from WeUnityX",
+        });
+
+        if (result.action === Share.sharedAction) {
+          // Post was shared successfully
+          // Share functionality here
+        }
+      } catch (error) {
+        console.error("Error sharing post:", error);
+        Alert.alert("Error", "Failed to share post");
+      }
+    };
+
+    const handleBlockUser = async () => {
+      try {
+        Alert.alert(
+          "Block User",
+          `Are you sure you want to block ${
+            postUser?.fullName || "this user"
+          }? You won't see their posts anymore.`,
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Block",
+              style: "destructive",
+              onPress: async () => {
+                await blockingService.blockUser(currentUser.uid, post.userId);
+                Alert.alert("Success", "User has been blocked");
+              },
             },
-          },
-        ]
-      );
-    } catch (error) {
-      console.error("Error blocking user:", error);
-      Alert.alert("Error", "Failed to block user");
+          ]
+        );
+      } catch (error) {
+        console.error("Error blocking user:", error);
+        Alert.alert("Error", "Failed to block user");
+      }
+    };
+
+    const handleReportPost = () => {
+      setShowReportModal(true);
+    };
+
+    const formatTimestamp = (timestamp) => {
+      if (!timestamp) return "";
+
+      const now = new Date();
+      const postTime = new Date(timestamp);
+      const diff = now - postTime;
+      const minutes = Math.floor(diff / (1000 * 60));
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+
+      if (minutes < 1) return "just now";
+      if (minutes < 60) return `${minutes}m ago`;
+      if (hours < 24) return `${hours}h ago`;
+      if (days < 7) return `${days}d ago`;
+
+      return postTime.toLocaleDateString();
+    };
+
+    // Don't render if user is not authenticated
+    if (!currentUser) {
+      return null;
     }
-  };
 
-  const handleReportPost = () => {
-    setShowReportModal(true);
-  };
-
-  const formatTimestamp = (timestamp) => {
-    if (!timestamp) return "";
-
-    const now = new Date();
-    const postTime = new Date(timestamp);
-    const diff = now - postTime;
-    const minutes = Math.floor(diff / (1000 * 60));
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (minutes < 1) return "just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
-
-    return postTime.toLocaleDateString();
-  };
-
-  // Don't render if user is not authenticated
-  if (!currentUser) {
-    return null;
-  }
-
-  return (
-    <>
-      <Card style={styles.postCard}>
-        <View style={styles.postHeader}>
-          <View style={{ flex: 1 }}>
-            <User
-              user={postUser}
-              onPress={(user) => {
-                navigation.navigate("UserProfile", { user });
-              }}
-            />
+    return (
+      <>
+        <Card style={styles.postCard}>
+          <View style={styles.postHeader}>
+            <View style={{ flex: 1 }}>
+              <User
+                user={postUser}
+                onPress={(user) => {
+                  navigation.navigate("UserProfile", { user });
+                }}
+              />
+            </View>
+            {post.userId !== currentUser.uid && (
+              <IconButton
+                icon="dots-vertical"
+                onPress={() => {
+                  Alert.alert("Post Options", "What would you like to do?", [
+                    { text: "Report Post", onPress: handleReportPost },
+                    { text: "Block User", onPress: handleBlockUser },
+                    { text: "Cancel", style: "cancel" },
+                  ]);
+                }}
+              />
+            )}
           </View>
-          {post.userId !== currentUser.uid && (
-            <IconButton
-              icon="dots-vertical"
-              onPress={() => {
-                Alert.alert("Post Options", "What would you like to do?", [
-                  { text: "Report Post", onPress: handleReportPost },
-                  { text: "Block User", onPress: handleBlockUser },
-                  { text: "Cancel", style: "cancel" },
-                ]);
-              }}
-            />
+
+          {post.image && (
+            <TouchableOpacity
+              onPress={() => setImageViewerVisible(true)}
+              activeOpacity={0.9}
+            >
+              <Image source={{ uri: post.image }} style={styles.postImage} />
+            </TouchableOpacity>
           )}
-        </View>
 
-        {post.content && <Text style={styles.postContent}>{post.content}</Text>}
+          {/* Image Viewer Modal */}
+          <Modal
+            visible={imageViewerVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setImageViewerVisible(false)}
+          >
+            <View style={styles.imageViewerContainer}>
+              <TouchableOpacity
+                style={styles.imageViewerClose}
+                onPress={() => setImageViewerVisible(false)}
+                activeOpacity={0.8}
+              >
+                <IconButton icon="close" iconColor="#fff" size={30} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.imageViewerTouchable}
+                activeOpacity={1}
+                onPress={() => setImageViewerVisible(false)}
+              >
+                <Image
+                  source={{ uri: post.image }}
+                  style={styles.imageViewerImage}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+          </Modal>
 
-        {post.image && (
-          <Image source={{ uri: post.image }} style={styles.postImage} />
-        )}
+          {post.video && (
+            <>
+              {!videoViewerVisible && (
+                <TouchableOpacity
+                  onPress={() => setVideoViewerVisible(true)}
+                  activeOpacity={0.9}
+                  style={styles.videoPreviewContainer}
+                >
+                  <Video
+                    source={{ uri: post.video }}
+                    style={styles.postVideo}
+                    useNativeControls={false}
+                    resizeMode="cover"
+                    shouldPlay={false}
+                    isMuted={true}
+                    isLooping={false}
+                  />
+                  <View style={styles.playIconOverlay}>
+                    <IconButton icon="play-circle" iconColor="#fff" size={60} />
+                  </View>
+                </TouchableOpacity>
+              )}
 
-        {post.video && (
-          <Video
-            source={{ uri: post.video }}
-            style={styles.postVideo}
-            useNativeControls
-            resizeMode="contain"
-            shouldPlay={false}
-          />
-        )}
+              {/* Video Viewer Modal */}
+              <Modal
+                visible={videoViewerVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setVideoViewerVisible(false)}
+              >
+                <View style={styles.videoViewerContainer}>
+                  <TouchableOpacity
+                    style={styles.videoViewerClose}
+                    onPress={() => setVideoViewerVisible(false)}
+                    activeOpacity={0.8}
+                  >
+                    <IconButton icon="close" iconColor="#fff" size={30} />
+                  </TouchableOpacity>
+                  <Video
+                    source={{ uri: post.video }}
+                    style={styles.videoViewerVideo}
+                    useNativeControls
+                    resizeMode="contain"
+                    shouldPlay={true}
+                    isMuted={false}
+                  />
+                </View>
+              </Modal>
+            </>
+          )}
+          {post.location && (
+            <Chip icon="map-marker" style={styles.locationChip}>
+              {post.location}
+            </Chip>
+          )}
+          <View style={styles.postActions}>
+            <View style={styles.leftActions}>
+              <IconButton
+                icon={liked ? "heart" : "heart-outline"}
+                iconColor={
+                  liked
+                    ? staticTheme.colors.error
+                    : staticTheme.colors.textSecondary
+                }
+                onPress={handleLike}
+              />
+              <Text style={styles.actionText}>{likesCount}</Text>
 
-        {post.location && (
-          <Chip icon="map-marker" style={styles.locationChip}>
-            {post.location}
-          </Chip>
-        )}
+              <IconButton
+                icon="comment-outline"
+                iconColor={staticTheme.colors.textSecondary}
+                onPress={handleComment}
+              />
+              <Text style={styles.actionText}>{post.commentsCount || 0}</Text>
 
-        <View style={styles.postActions}>
-          <View style={styles.leftActions}>
+              <IconButton
+                icon="share-outline"
+                iconColor={staticTheme.colors.textSecondary}
+                onPress={handleShare}
+              />
+            </View>
+
             <IconButton
-              icon={liked ? "heart" : "heart-outline"}
+              icon={saved ? "bookmark" : "bookmark-outline"}
               iconColor={
-                liked
-                  ? staticTheme.colors.error
+                saved
+                  ? staticTheme.colors.primary
                   : staticTheme.colors.textSecondary
               }
-              onPress={handleLike}
-            />
-            <Text style={styles.actionText}>{likesCount}</Text>
-
-            <IconButton
-              icon="comment-outline"
-              iconColor={staticTheme.colors.textSecondary}
-              onPress={handleComment}
-            />
-            <Text style={styles.actionText}>{post.commentsCount || 0}</Text>
-
-            <IconButton
-              icon="share-outline"
-              iconColor={staticTheme.colors.textSecondary}
-              onPress={handleShare}
+              onPress={handleSave}
             />
           </View>
+          <Text style={styles.timestamp}>
+            {formatTimestamp(post.createdAt)}
+          </Text>
+        </Card>
 
-          <IconButton
-            icon={saved ? "bookmark" : "bookmark-outline"}
-            iconColor={
-              saved
-                ? staticTheme.colors.primary
-                : staticTheme.colors.textSecondary
-            }
-            onPress={handleSave}
-          />
-        </View>
-
-        <Text style={styles.timestamp}>{formatTimestamp(post.createdAt)}</Text>
-      </Card>
-
-      <ReportModal
-        visible={showReportModal}
-        onDismiss={() => setShowReportModal(false)}
-        contentType="post"
-        contentId={post.id}
-        contentOwnerId={post.userId}
-        reporterId={currentUser.uid}
-      />
-    </>
-  );
-};
+        <ReportModal
+          visible={showReportModal}
+          onDismiss={() => setShowReportModal(false)}
+          contentType="post"
+          contentId={post.id}
+          contentOwnerId={post.userId}
+          reporterId={currentUser.uid}
+        />
+      </>
+    );
+  }
+);
 
 const HomeScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -664,6 +734,16 @@ const HomeScreen = ({ navigation }) => {
         ]}
         ListHeaderComponent={<StoriesSection />}
         ListEmptyComponent={<EmptyState />}
+        maxToRenderPerBatch={5}
+        updateCellsBatchingPeriod={50}
+        initialNumToRender={3}
+        windowSize={5}
+        removeClippedSubviews={true}
+        getItemLayout={(data, index) => ({
+          length: 400,
+          offset: 400 * index,
+          index,
+        })}
       />
     </View>
   );
@@ -757,6 +837,29 @@ const styles = StyleSheet.create({
     marginVertical: spacing.sm,
     backgroundColor: staticTheme.colors.surface,
   },
+  videoPreviewContainer: {
+    position: "relative",
+  },
+  videoPlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#1a1a1a",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 8,
+  },
+  playIconOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    borderRadius: 8,
+    marginVertical: spacing.sm,
+  },
   locationChip: {
     alignSelf: "flex-start",
     marginVertical: spacing.sm,
@@ -765,7 +868,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: spacing.sm,
   },
   leftActions: {
     flexDirection: "row",
@@ -774,18 +876,68 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 14,
     color: staticTheme.colors.textSecondary,
-    marginRight: spacing.md,
+    marginRight: spacing.sm,
   },
   timestamp: {
     fontSize: 12,
     color: staticTheme.colors.textSecondary,
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
-  emptyContainer: {
-    alignItems: "center",
+  // Image Viewer Styles
+  imageViewerContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.95)",
     justifyContent: "center",
-    paddingVertical: spacing.xxl,
+    alignItems: "center",
+  },
+  imageViewerClose: {
+    position: "absolute",
+    top: 40,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    borderRadius: 25,
+  },
+  imageViewerTouchable: {
+    flex: 1,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imageViewerImage: {
+    width: "100%",
+    height: "100%",
+  },
+  // Video Viewer Styles
+  videoViewerContainer: {
+    flex: 1,
+    backgroundColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  videoViewerClose: {
+    position: "absolute",
+    top: 40,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    borderRadius: 25,
+  },
+  videoViewerVideo: {
+    width: "100%",
+    height: "100%",
+  },
+  // Empty State Styles
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: spacing.lg,
+  },
+  emptyImage: {
+    width: 200,
+    height: 200,
+    marginBottom: spacing.lg,
   },
   emptyTitle: {
     fontSize: 24,

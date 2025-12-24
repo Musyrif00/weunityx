@@ -197,14 +197,23 @@ const SavedPostsScreen = ({ navigation }) => {
     });
   };
 
-  const renderSavedPost = ({ item }) => (
-    <SavedPostCard
-      post={item}
-      user={users[item.userId]}
-      onUnsave={handleUnsave}
-      onComment={handleComment}
-    />
-  );
+  const renderSavedPost = ({ item }) => {
+    const postUser = users[item.userId];
+
+    // Skip rendering if user data not loaded yet
+    if (!postUser) {
+      return null;
+    }
+
+    return (
+      <SavedPostCard
+        post={item}
+        user={postUser}
+        onUnsave={handleUnsave}
+        onComment={handleComment}
+      />
+    );
+  };
 
   if (loading) {
     return (
