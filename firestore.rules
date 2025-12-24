@@ -1,0 +1,238 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isValidUser() {
+      return isSignedIn() 
+        && request.resource.data.keys().hasAll(['fullName', 'username', 'email'])
+        && request.resource.data.username is string
+        && request.resource.data.email is string;
+    }
+    
+    // Check if user is not blocked
+    function isNotBlocked(targetUserId) {
+      let blockId1 = targetUserId + '_' + request.auth.uid;
+      let blockId2 = request.auth.uid + '_' + targetUserId;
+      return !exists(/databases/$(database)/documents/blockedUsers/$(blockId1))
+        && !exists(/databases/$(database)/documents/blockedUsers/$(blockId2));
+    }
+    
+    // ============================================
+    // USERS COLLECTION
+    // ============================================
+    match /users/{userId} {
+      // Anyone can read user profiles (for discovery)
+      allow read: if isSignedIn();
+      
+      // Users can only create their own profile
+      allow create: if isOwner(userId) && isValidUser();
+      
+      // Users can only update their own profile
+      allow update: if isOwner(userId)
+        // Prevent changing certain fields
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['email', 'createdAt']);
+      
+      // Users can only delete their own profile
+      allow delete: if isOwner(userId);
+    }
+    
+    // ============================================
+    // POSTS COLLECTION
+    // ============================================
+    match /posts/{postId} {
+      // Anyone authenticated can read posts
+      allow read: if isSignedIn();
+      
+      // Users can create posts with required fields
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasAll(['userId', 'content', 'createdAt']);
+      
+      // Users can only update their own posts
+      allow update: if isOwner(resource.data.userId)
+        // Or users can update likes/comments arrays
+        || (isSignedIn() && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likesCount', 'comments', 'commentsCount', 'updatedAt'])
+        ));
+      
+      // Users can only delete their own posts
+      allow delete: if isOwner(resource.data.userId);
+    }
+    
+    // ============================================
+    // MESSAGES COLLECTION
+    // ============================================
+    match /messages/{messageId} {
+      // Users can read messages where they are sender or receiver
+      allow read: if isSignedIn()
+        && (request.auth.uid == resource.data.senderId 
+          || request.auth.uid == resource.data.receiverId)
+        && isNotBlocked(resource.data.senderId)
+        && isNotBlocked(resource.data.receiverId);
+      
+      // Users can create messages where they are the sender
+      allow create: if isSignedIn()
+        && request.auth.uid == request.resource.data.senderId
+        && request.resource.data.keys().hasAll(['chatId', 'senderId', 'receiverId', 'message', 'type'])
+        && isNotBlocked(request.resource.data.receiverId);
+      
+      // Users can update read status of their received messages
+      allow update: if isSignedIn()
+        && request.auth.uid == resource.data.receiverId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      
+      // Users can delete their own sent messages
+      allow delete: if isOwner(resource.data.senderId);
+    }
+    
+    // ============================================
+    // CHATS COLLECTION
+    // ============================================
+    match /chats/{chatId} {
+      // Users can read chats they are participants in
+      allow read: if isSignedIn()
+        && request.auth.uid in resource.data.participants;
+      
+      // Users can create chats where they are a participant
+      allow create: if isSignedIn()
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.participants.size() == 2
+        && request.resource.data.keys().hasAll(['participants', 'participantsData', 'lastMessage', 'createdAt']);
+      
+      // Participants can update chat (last message, unread counts)
+      allow update: if isSignedIn()
+        && request.auth.uid in resource.data.participants;
+      
+      // Participants can delete chat
+      allow delete: if isSignedIn()
+        && request.auth.uid in resource.data.participants;
+    }
+    
+    // ============================================
+    // NOTIFICATIONS COLLECTION
+    // ============================================
+    match /notifications/{notificationId} {
+      // Users can only read their own notifications
+      allow read: if isOwner(resource.data.userId);
+      
+      // Any authenticated user can create notifications (for sending to others)
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasAll(['userId', 'type', 'message']);
+      
+      // Users can only update their own notifications (mark as read)
+      allow update: if isOwner(resource.data.userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      
+      // Users can delete their own notifications
+      allow delete: if isOwner(resource.data.userId);
+    }
+    
+    // ============================================
+    // STORIES COLLECTION
+    // ============================================
+    match /stories/{storyId} {
+      // Anyone can read active stories (not expired)
+      allow read: if isSignedIn()
+        && resource.data.expiresAt > request.time;
+      
+      // Users can create their own stories
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasAll(['userId', 'createdAt', 'expiresAt']);
+      
+      // Users can update their own stories (add views)
+      allow update: if isOwner(resource.data.userId)
+        || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'viewsCount']));
+      
+      // Users can delete their own stories
+      allow delete: if isOwner(resource.data.userId);
+    }
+    
+    // ============================================
+    // SAVED POSTS COLLECTION
+    // ============================================
+    match /savedPosts/{saveId} {
+      // Users can read their own saved posts
+      allow read: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+      
+      // Users can save posts
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasAll(['userId', 'postId', 'savedAt']);
+      
+      // Users can delete their own saved posts
+      allow delete: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+    }
+    
+    // ============================================
+    // BLOCKED USERS COLLECTION
+    // ============================================
+    match /blockedUsers/{blockId} {
+      // Users can read their own block list
+      allow read: if isSignedIn()
+        && resource.data.blockerId == request.auth.uid;
+      
+      // Users can block other users
+      allow create: if isSignedIn()
+        && request.resource.data.blockerId == request.auth.uid
+        && request.resource.data.keys().hasAll(['blockerId', 'blockedUserId', 'blockedAt'])
+        && request.resource.data.blockerId != request.resource.data.blockedUserId;
+      
+      // Users can unblock (delete block record)
+      allow delete: if isSignedIn()
+        && resource.data.blockerId == request.auth.uid;
+    }
+    
+    // ============================================
+    // REPORTS COLLECTION
+    // ============================================
+    match /reports/{reportId} {
+      // Users can read their own reports
+      allow read: if isSignedIn()
+        && resource.data.reporterId == request.auth.uid;
+      
+      // Any authenticated user can create reports
+      allow create: if isSignedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.keys().hasAll(['reporterId', 'contentType', 'contentId', 'reason']);
+      
+      // Only admins should update reports (status, resolution)
+      // For now, prevent updates from regular users
+      allow update: if false;
+      
+      // Users cannot delete reports
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // LIVE STREAMS COLLECTION
+    // ============================================
+    match /liveStreams/{streamId} {
+      // Anyone can read active live streams
+      allow read: if isSignedIn();
+      
+      // Users can create their own live streams
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasAll(['userId', 'channelName', 'title', 'isActive']);
+      
+      // Stream owners can update their streams, or anyone can increment viewer count
+      allow update: if isOwner(resource.data.userId)
+        || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewerCount', 'viewers']));
+      
+      // Users can delete their own streams
+      allow delete: if isOwner(resource.data.userId);
+    }
+  }
+}

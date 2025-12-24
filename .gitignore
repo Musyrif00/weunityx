@@ -87,7 +87,6 @@ firebase-debug.log
 firestore-debug.log
 functions/.env
 functions/.env.*
-google-services.json
 
 # GitHub Copilot
 .github/copilot-instructions.md
